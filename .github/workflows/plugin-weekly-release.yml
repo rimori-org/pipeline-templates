@@ -199,20 +199,23 @@ jobs:
             echo "**Please review and merge this PR to proceed with the release.**"
           } > pr_body.txt
 
-          PR_NUMBER=$(gh pr create \
+          PR_OUTPUT=$(gh pr create \
             --base main \
             --head ${{ steps.branch.outputs.name }} \
             --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
             --body-file pr_body.txt \
-            --label "release,weekly-deployment" \
-            --json number \
-            --jq '.number' || echo "")
+            --label "release" \
+            --label "weekly-deployment" 2>&1 || echo "")
+
+          # Extract PR number from output (e.g., "https://github.com/owner/repo/pull/123" or "#123")
+          PR_NUMBER=$(echo "$PR_OUTPUT" | sed -n 's/.*pull\/\([0-9]*\).*/\1/p' | head -1)
 
           if [ -n "$PR_NUMBER" ]; then
             echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "Pull request #$PR_NUMBER created successfully"
           else
             echo "Failed to create pull request or PR already exists"
+            echo "Output: $PR_OUTPUT"
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
