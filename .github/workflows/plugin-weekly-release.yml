@@ -19,6 +19,8 @@ on:
         required: true
       OPENAI_API_KEY:
         required: true
+      PAT_TOKEN:
+        required: true
 
 env:
   SLACK_CHANNEL_ID: C09FDPQ8XPB
@@ -136,7 +138,8 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
-          persist-credentials: true
+          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -165,11 +168,6 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Configure Git credentials
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Create release branch from dev
         id: branch
         run: |
@@ -178,41 +176,42 @@ jobs:
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Configure Git credentials for PAT
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
 
       - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
         id: create-pr
-        run: |
-          {
-            echo "## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
-            echo ""
-            echo "${{ steps.changelog.outputs.content }}"
-            echo ""
-            echo "---"
-            echo ""
-            echo "**Automated Release**"
-            echo "- Date: ${{ steps.date.outputs.value }}"
-            echo "- Branch: ${{ steps.branch.outputs.name }}"
-            echo "- Release Channel: ${{ inputs.release_channel }}"
-            echo ""
-            echo "**Please review and merge this PR to proceed with the release.**"
-          } > pr_body.txt
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          branch: ${{ steps.branch.outputs.name }}
+          base: main
+          commit-message: "chore: weekly release ${{ steps.date.outputs.value }}"
+          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
+          body: |
+            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}
 
-          PR_JSON=$(gh pr create \
-            --base main \
-            --head ${{ steps.branch.outputs.name }} \
-            --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
-            --body-file pr_body.txt)
+            ${{ steps.changelog.outputs.content }}
 
-          PR_URL=$(echo "$PR_JSON" | grep "https://github.com" | head -n 1)
+            ---
 
-          echo "url=$PR_URL" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+            **Automated Release**
+            - Date: ${{ steps.date.outputs.value }}
+            - Branch: ${{ steps.branch.outputs.name }}
+            - Release Channel: ${{ inputs.release_channel }}
+
+            **Please review and merge this PR to proceed with the release.**
+          labels: release,weekly-deployment
+          delete-branch: false
 
       - name: Send Slack notification - PR Created
-        if: steps.create-pr.outputs.url != ''
+        if: steps.create-pr.outputs.pull-request-number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
@@ -247,7 +246,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Pull Request:*\n<${{ steps.create-pr.outputs.url }}|Open PR>"
+                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pull-request-number }}|View PR #${{ steps.create-pr.outputs.pull-request-number }}>"
                     },
                     {
                       "type": "mrkdwn",
