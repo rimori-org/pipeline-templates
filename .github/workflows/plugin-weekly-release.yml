@@ -165,7 +165,12 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create release branch
+      - name: Configure Git credentials
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch from dev
         id: branch
         run: |
           DATE=$(date +%Y-%m-%d)
@@ -173,41 +178,47 @@ jobs:
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Configure Git credentials
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
         id: create-pr
-        with:
-          token: ${{ github.token }}
-          branch: ${{ steps.branch.outputs.name }}
-          base: main
-          commit-message: "chore: weekly release ${{ steps.date.outputs.value }}"
-          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
-          body: |
-            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}
+        run: |
+          {
+            echo "## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
+            echo ""
+            echo "${{ steps.changelog.outputs.content }}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Automated Release**"
+            echo "- Date: ${{ steps.date.outputs.value }}"
+            echo "- Branch: ${{ steps.branch.outputs.name }}"
+            echo "- Release Channel: ${{ inputs.release_channel }}"
+            echo ""
+            echo "**Please review and merge this PR to proceed with the release.**"
+          } > pr_body.txt
 
-            ${{ steps.changelog.outputs.content }}
+          PR_NUMBER=$(gh pr create \
+            --base main \
+            --head ${{ steps.branch.outputs.name }} \
+            --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
+            --body-file pr_body.txt \
+            --label "release,weekly-deployment" \
+            --json number \
+            --jq '.number' || echo "")
 
-            ---
-
-            **Automated Release**
-            - Date: ${{ steps.date.outputs.value }}
-            - Branch: ${{ steps.branch.outputs.name }}
-            - Release Channel: ${{ inputs.release_channel }}
-
-            **Please review and merge this PR to proceed with the release.**
-          labels: release,weekly-deployment
-          delete-branch: false
+          if [ -n "$PR_NUMBER" ]; then
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "Pull request #$PR_NUMBER created successfully"
+          else
+            echo "Failed to create pull request or PR already exists"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Send Slack notification - PR Created
-        if: steps.create-pr.outputs.pull-request-number != ''
+        if: steps.create-pr.outputs.number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
@@ -242,7 +253,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pull-request-number }}|View PR #${{ steps.create-pr.outputs.pull-request-number }}>"
+                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.number }}|View PR #${{ steps.create-pr.outputs.number }}>"
                     },
                     {
                       "type": "mrkdwn",
