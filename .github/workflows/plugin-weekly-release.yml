@@ -181,6 +181,19 @@ jobs:
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
 
+     - name: Install latest GitHub CLI
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install -y curl)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
+            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+          sudo apt update
+          sudo apt install -y gh
+
       - name: Create Pull Request
         id: create-pr
         run: |
@@ -199,38 +212,20 @@ jobs:
             echo "**Please review and merge this PR to proceed with the release.**"
           } > pr_body.txt
 
-          PR_OUTPUT=$(gh pr create \
+          PR_JSON=$(gh pr create \
             --base main \
             --head ${{ steps.branch.outputs.name }} \
             --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
-            --body-file pr_body.txt 2>&1)
-          PR_EXIT_CODE=$?
+            --body-file pr_body.txt \
+            --json url)
 
-          # Extract PR number from output (e.g., "https://github.com/owner/repo/pull/123" or "#123")
-          PR_NUMBER=$(echo "$PR_OUTPUT" | sed -n 's/.*pull\/\([0-9]*\).*/\1/p' | head -1)
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
 
-          if [ $PR_EXIT_CODE -eq 0 ] && [ -n "$PR_NUMBER" ]; then
-            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "Pull request #$PR_NUMBER created successfully"
-          else
-            # Check if PR already exists
-            EXISTING_PR=$(gh pr list --head "${{ steps.branch.outputs.name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
-            
-            if [ -n "$EXISTING_PR" ]; then
-              echo "number=$EXISTING_PR" >> $GITHUB_OUTPUT
-              echo "Pull request #$EXISTING_PR already exists for this branch"
-            else
-              echo "❌ Failed to create pull request"
-              echo "Exit code: $PR_EXIT_CODE"
-              echo "Output: $PR_OUTPUT"
-              exit 1
-            fi
-          fi
+          echo "url=$PR_URL" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Send Slack notification - PR Created
-        if: steps.create-pr.outputs.number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
@@ -265,7 +260,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.number }}|View PR #${{ steps.create-pr.outputs.number }}>"
+                      "text": "Pull Request:*\n<${{ steps.create-pr.outputs.url }}|Open PR>"
                     },
                     {
                       "type": "mrkdwn",
