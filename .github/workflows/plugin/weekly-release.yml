@@ -7,14 +7,6 @@ on:
         description: 'Name of the plugin (e.g., flashcards)'
         required: true
         type: string
-      slack_channel_id:
-        description: 'Slack channel ID for notifications'
-        required: true
-        type: string
-      slack_pr_channel_id:
-        description: 'Slack channel ID for PR notifications'
-        required: true
-        type: string
       release_channel:
         description: 'Release channel (alpha/beta/stable)'
         required: false
@@ -24,6 +16,10 @@ on:
       RIMORI_TOKEN:
         required: true
       SLACK_BOT_TOKEN:
+        required: true
+      SLACK_CHANNEL_ID:
+        required: true
+      SLACK_PR_CHANNEL_ID:
         required: true
       PAT_TOKEN:
         required: true
@@ -82,7 +78,7 @@ jobs:
       - name: Send Slack notification - Build Failure
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ inputs.slack_channel_id }}
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
               "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed",
@@ -219,7 +215,7 @@ jobs:
         if: steps.create-pr.outputs.pull-request-number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ inputs.slack_pr_channel_id }}
+          channel-id: ${{ secrets.SLACK_PR_CHANNEL_ID }}
           payload: |
             {
               "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release PR Ready for Review",

@@ -7,14 +7,12 @@ on:
         description: 'Name of the plugin (e.g., flashcards)'
         required: true
         type: string
-      slack_channel_id:
-        description: 'Slack channel ID for notifications'
-        required: true
-        type: string
     secrets:
       RIMORI_TOKEN:
         required: true
       SLACK_BOT_TOKEN:
+        required: true
+      SLACK_CHANNEL_ID:
         required: true
 
 jobs:
@@ -106,7 +104,7 @@ jobs:
         if: success()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ inputs.slack_channel_id }}
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
               "text": "✅ ${{ inputs.plugin_name }} Plugin Production Release",
@@ -151,7 +149,7 @@ jobs:
         if: failure()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ inputs.slack_channel_id }}
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
               "text": "❌ ${{ inputs.plugin_name }} Plugin Production Release Failed",
