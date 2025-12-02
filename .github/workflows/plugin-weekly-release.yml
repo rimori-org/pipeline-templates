@@ -181,19 +181,6 @@ jobs:
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
 
-      - name: Install latest GitHub CLI
-        run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install -y curl)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
-            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-
-          echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
-            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-
-          sudo apt update
-          sudo apt install -y gh
-
       - name: Create Pull Request
         id: create-pr
         run: |
@@ -216,16 +203,16 @@ jobs:
             --base main \
             --head ${{ steps.branch.outputs.name }} \
             --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
-            --body-file pr_body.txt \
-            --json url)
+            --body-file pr_body.txt)
 
-          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          PR_URL=$(echo "$PR_JSON" | grep "https://github.com" | head -n 1)
 
           echo "url=$PR_URL" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Send Slack notification - PR Created
+        if: steps.create-pr.outputs.url != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
@@ -260,7 +247,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "Pull Request:*\n<${{ steps.create-pr.outputs.url }}|Open PR>"
+                      "text": "*Pull Request:*\n<${{ steps.create-pr.outputs.url }}|Open PR>"
                     },
                     {
                       "type": "mrkdwn",
