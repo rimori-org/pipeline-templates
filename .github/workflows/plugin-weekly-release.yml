@@ -237,8 +237,15 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           branch: ${{ steps.branch.outputs.name }}
           base: main
+          labels: release,weekly-deployment
+          delete-branch: false
+          draft: false
           commit-message: "chore: bump version to ${{ steps.version.outputs.version }}"
           title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}"
+          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          # push-to-fork: false
+          skip-rebase: true
           body: |
             ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}
 
@@ -253,8 +260,6 @@ jobs:
             - Release Channel: ${{ inputs.release_channel }}
 
             **Please review and merge this PR to proceed with the release.**
-          labels: release,weekly-deployment
-          delete-branch: false
 
       - name: Send Slack notification - PR Created
         if: steps.create-pr.outputs.pull-request-number != ''
