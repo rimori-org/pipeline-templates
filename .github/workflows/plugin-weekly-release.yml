@@ -48,8 +48,8 @@ jobs:
       - name: TypeScript check
         run: yarn run check
 
-      - name: Run linter
-        run: yarn lint
+      # - name: Run linter - disabled for now because the linting takes more then 45min with the flashcard plugin
+      #   run: yarn lint
 
       - name: Build worker
         run: yarn build:worker
