@@ -203,19 +203,28 @@ jobs:
             --base main \
             --head ${{ steps.branch.outputs.name }} \
             --title "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}" \
-            --body-file pr_body.txt \
-            --label "release" \
-            --label "weekly-deployment" 2>&1 || echo "")
+            --body-file pr_body.txt 2>&1)
+          PR_EXIT_CODE=$?
 
           # Extract PR number from output (e.g., "https://github.com/owner/repo/pull/123" or "#123")
           PR_NUMBER=$(echo "$PR_OUTPUT" | sed -n 's/.*pull\/\([0-9]*\).*/\1/p' | head -1)
 
-          if [ -n "$PR_NUMBER" ]; then
+          if [ $PR_EXIT_CODE -eq 0 ] && [ -n "$PR_NUMBER" ]; then
             echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "Pull request #$PR_NUMBER created successfully"
           else
-            echo "Failed to create pull request or PR already exists"
-            echo "Output: $PR_OUTPUT"
+            # Check if PR already exists
+            EXISTING_PR=$(gh pr list --head "${{ steps.branch.outputs.name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
+            
+            if [ -n "$EXISTING_PR" ]; then
+              echo "number=$EXISTING_PR" >> $GITHUB_OUTPUT
+              echo "Pull request #$EXISTING_PR already exists for this branch"
+            else
+              echo "❌ Failed to create pull request"
+              echo "Exit code: $PR_EXIT_CODE"
+              echo "Output: $PR_OUTPUT"
+              exit 1
+            fi
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
