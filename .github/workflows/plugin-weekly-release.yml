@@ -181,21 +181,15 @@ jobs:
           git fetch origin main
           git fetch origin dev
 
-      - name: Create release branch from dev
-        id: branch
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          BRANCH_NAME="release/weekly-${DATE}"
-          git checkout dev
-          git pull origin dev
-          git checkout -b "${BRANCH_NAME}"
-          echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Get current version
+      - name: Get current version from main
         id: current_version
         run: |
+          # Get version from main branch to ensure we bump from the correct base
+          git checkout main
+          git pull origin main
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "value=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version in main: $CURRENT_VERSION"
 
       - name: Determine next version
         id: version
@@ -207,6 +201,16 @@ jobs:
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Determined release version: $NEW_VERSION"
+
+      - name: Create release branch from dev
+        id: branch
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH_NAME="release/weekly-${DATE}"
+          git checkout dev
+          git pull origin dev
+          git checkout -b "${BRANCH_NAME}"
+          echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
       - name: Update package version
         run: |
