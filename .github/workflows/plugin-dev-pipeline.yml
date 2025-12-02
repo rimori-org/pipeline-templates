@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       plugin_name:
-        description: 'Name of the plugin (e.g., flashcards)'
+        description: "Name of the plugin (e.g., flashcards)"
         required: true
         type: string
     secrets:
@@ -12,12 +12,12 @@ on:
         required: true
       SLACK_BOT_TOKEN:
         required: true
-      SLACK_CHANNEL_ID:
-        required: true
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      SLACK_CHANNEL_ID: C09FDPQ8XPB
 
     steps:
       - name: Checkout code
@@ -26,10 +26,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
           cache-dependency-path: yarn.lock
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Get latest pre-release versions
         if: github.event_name == 'push'
@@ -121,7 +121,7 @@ jobs:
         if: always()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
               "text": "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || '✅ Plugin Release') || '❌ Pipeline Failed' }}",
@@ -144,4 +144,3 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-

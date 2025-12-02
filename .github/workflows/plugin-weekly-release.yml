@@ -4,27 +4,27 @@ on:
   workflow_call:
     inputs:
       plugin_name:
-        description: 'Name of the plugin (e.g., flashcards)'
+        description: "Name of the plugin (e.g., flashcards)"
         required: true
         type: string
       release_channel:
-        description: 'Release channel (alpha/beta/stable)'
+        description: "Release channel (alpha/beta/stable)"
         required: false
         type: string
-        default: 'alpha'
+        default: "alpha"
     secrets:
       RIMORI_TOKEN:
         required: true
       SLACK_BOT_TOKEN:
         required: true
-      SLACK_CHANNEL_ID:
-        required: true
-      SLACK_PR_CHANNEL_ID:
-        required: true
       PAT_TOKEN:
         required: true
       OPENAI_API_KEY:
         required: true
+
+env:
+  SLACK_CHANNEL_ID: C09FDPQ8XPB
+  SLACK_PR_CHANNEL_ID: C09VCT4JFU4
 
 jobs:
   lint-and-build:
@@ -40,10 +40,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
           cache-dependency-path: yarn.lock
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -78,7 +78,7 @@ jobs:
       - name: Send Slack notification - Build Failure
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
               "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed",
@@ -145,10 +145,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
           cache-dependency-path: yarn.lock
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Get release date
         id: date
@@ -193,8 +193,8 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           branch: ${{ steps.branch.outputs.name }}
           base: main
-          commit-message: 'chore: weekly release ${{ steps.date.outputs.value }}'
-          title: 'Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}'
+          commit-message: "chore: weekly release ${{ steps.date.outputs.value }}"
+          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
           body: |
             ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}
 
@@ -215,7 +215,7 @@ jobs:
         if: steps.create-pr.outputs.pull-request-number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ secrets.SLACK_PR_CHANNEL_ID }}
+          channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
           payload: |
             {
               "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release PR Ready for Review",
@@ -269,4 +269,3 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
