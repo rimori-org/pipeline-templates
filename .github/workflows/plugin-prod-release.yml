@@ -113,12 +113,17 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
 
-          # Fetch all branches
-          git fetch origin dev:dev
+          # Fetch dev and main
+          git fetch origin dev
+          git fetch origin main
 
-          # Checkout dev and merge main into it
+          # Checkout dev
           git checkout dev
-          git merge origin/main --no-edit -m "chore: sync main back to dev after production release"
+
+          # Merge main into dev, allow unrelated histories only for the first merge
+          git merge origin/main --allow-unrelated-histories --no-edit -m "chore: sync main back to dev after production release"
+
+          # Push dev back to origin
           git push origin dev
 
           echo "Successfully synced main back to dev"
