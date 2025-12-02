@@ -1,0 +1,190 @@
+name: Plugin Production Release
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: 'Name of the plugin (e.g., flashcards)'
+        required: true
+        type: string
+      slack_channel_id:
+        description: 'Slack channel ID for notifications'
+        required: true
+        type: string
+    secrets:
+      RIMORI_TOKEN:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+
+jobs:
+  release:
+    name: Build, Test and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: yarn.lock
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Get latest stable playwright-testing version
+        id: playwright_version
+        run: |
+          # Get latest stable @rimori/playwright-testing
+          PLAYWRIGHT_VERSION=$(npm view @rimori/playwright-testing@latest version 2>/dev/null || echo "")
+          if [ -z "$PLAYWRIGHT_VERSION" ]; then
+            echo "⚠️  Warning: No @rimori/playwright-testing@latest version found. Using current dependency version."
+            PLAYWRIGHT_VERSION=$(node -p "require('./package.json').devDependencies['@rimori/playwright-testing']")
+            PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION#^}"
+          fi
+          echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using @rimori/playwright-testing version: $PLAYWRIGHT_VERSION"
+
+      - name: Restore package.json from git (ignore local changes)
+        run: git checkout HEAD -- package.json
+
+      - name: Update playwright-testing to latest stable
+        run: |
+          yarn add "@rimori/playwright-testing@${{ steps.playwright_version.outputs.playwright_version }}" --dev --exact
+          echo "Updated @rimori/playwright-testing to: ${{ steps.playwright_version.outputs.playwright_version }}"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: TypeScript check
+        run: yarn run check
+
+      - name: Build worker
+        run: yarn build:worker
+
+      - name: Build Project
+        run: yarn build
+
+      - name: Install Playwright browsers
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run tests
+        run: yarn test
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+
+      # Beta channel releases
+      - name: Release Beta to Dev Environment
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+        run: yarn rimori-release beta
+
+      - name: Release Beta to Production Environment
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://api.rimori.se
+        run: yarn rimori-release beta
+
+      # Stable channel releases
+      - name: Release Stable to Dev Environment
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+        run: yarn rimori-release stable
+
+      - name: Release Stable to Production Environment
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://api.rimori.se
+        run: yarn rimori-release stable
+
+      - name: Send Slack notification - Success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ inputs.slack_channel_id }}
+          payload: |
+            {
+              "text": "✅ ${{ inputs.plugin_name }} Plugin Production Release",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ ${{ inputs.plugin_name }} Plugin Production Release (main) Succeeded"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\nmain"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Release Channels:*\nBeta + Stable"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environments:*\nDev + Production"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Pipeline:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Send Slack notification - Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ inputs.slack_channel_id }}
+          payload: |
+            {
+              "text": "❌ ${{ inputs.plugin_name }} Plugin Production Release Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ ${{ inputs.plugin_name }} Plugin Production Release (main) Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\nmain"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* Review the pipeline failures and fix the issues before retrying the release."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+

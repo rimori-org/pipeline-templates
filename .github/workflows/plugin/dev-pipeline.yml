@@ -1,0 +1,149 @@
+name: Plugin Dev Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: 'Name of the plugin (e.g., flashcards)'
+        required: true
+        type: string
+      slack_channel_id:
+        description: 'Slack channel ID for notifications'
+        required: true
+        type: string
+    secrets:
+      RIMORI_TOKEN:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: yarn.lock
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Get latest pre-release versions
+        if: github.event_name == 'push'
+        id: versions
+        run: |
+          # Get @rimori/client@next
+          CLIENT_VERSION=$(npm view @rimori/client@next version 2>/dev/null || echo "")
+          if [ -z "$CLIENT_VERSION" ]; then
+            echo "⚠️  Warning: No @rimori/client@next version found. Using current dependency version."
+            CLIENT_VERSION=$(node -p "require('./package.json').dependencies['@rimori/client']")
+            CLIENT_VERSION="${CLIENT_VERSION#^}"
+          fi
+          echo "client_version=$CLIENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using @rimori/client version: $CLIENT_VERSION"
+
+          # Get @rimori/react-client@next
+          REACT_CLIENT_VERSION=$(npm view @rimori/react-client@next version 2>/dev/null || echo "")
+          if [ -z "$REACT_CLIENT_VERSION" ]; then
+            echo "⚠️  Warning: No @rimori/react-client@next version found. Using current dependency version."
+            REACT_CLIENT_VERSION=$(node -p "require('./package.json').dependencies['@rimori/react-client']")
+            REACT_CLIENT_VERSION="${REACT_CLIENT_VERSION#^}"
+          fi
+          echo "react_client_version=$REACT_CLIENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using @rimori/react-client version: $REACT_CLIENT_VERSION"
+
+          # Get @rimori/playwright-testing@next
+          PLAYWRIGHT_VERSION=$(npm view @rimori/playwright-testing@next version 2>/dev/null || echo "")
+          if [ -z "$PLAYWRIGHT_VERSION" ]; then
+            echo "⚠️  Warning: No @rimori/playwright-testing@next version found. Using current dependency version."
+            PLAYWRIGHT_VERSION=$(node -p "require('./package.json').devDependencies['@rimori/playwright-testing']")
+            PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION#^}"
+          fi
+          echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using @rimori/playwright-testing version: $PLAYWRIGHT_VERSION"
+
+      - name: Restore package.json from git (ignore local changes)
+        run: git checkout HEAD -- package.json
+
+      - name: Update dependencies to latest pre-releases
+        if: github.event_name == 'push'
+        run: |
+          yarn add "@rimori/client@${{ steps.versions.outputs.client_version }}" --exact
+          yarn add "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" --exact
+          yarn add "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" --dev --exact
+          echo "Updated dependencies:"
+          echo "  @rimori/client: ${{ steps.versions.outputs.client_version }}"
+          echo "  @rimori/react-client: ${{ steps.versions.outputs.react_client_version }}"
+          echo "  @rimori/playwright-testing: ${{ steps.versions.outputs.playwright_version }}"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: TypeScript check
+        run: yarn run check
+
+      - name: Build worker
+        run: yarn build:worker
+
+      - name: Build Project
+        run: yarn build
+
+      - name: Install Playwright browsers
+        if: github.event_name == 'push'
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run tests
+        if: github.event_name == 'push'
+        run: yarn test
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+
+      # Dev branch releases
+      - name: Release Alpha to Dev Environment
+        if: github.event_name == 'push'
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+        run: yarn rimori-release alpha
+
+      - name: Release Alpha to Production Environment
+        if: github.event_name == 'push'
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://api.rimori.se
+        run: yarn rimori-release alpha
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ inputs.slack_channel_id }}
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || '✅ Plugin Release') || '❌ Pipeline Failed' }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || 'Plugin Release' }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }}) ${{ job.status == 'success' && 'Succeeded' || 'Failed' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ github.event_name == 'push' && format('*Dependencies:*\n  @rimori/client: {0}\n  @rimori/react-client: {1}\n  @rimori/playwright-testing: {2}\n\n', steps.versions.outputs.client_version, steps.versions.outputs.react_client_version, steps.versions.outputs.playwright_version) || '' }}*Pipeline:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+

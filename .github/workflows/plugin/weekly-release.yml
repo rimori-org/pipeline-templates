@@ -1,0 +1,276 @@
+name: Plugin Weekly Release
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: 'Name of the plugin (e.g., flashcards)'
+        required: true
+        type: string
+      slack_channel_id:
+        description: 'Slack channel ID for notifications'
+        required: true
+        type: string
+      slack_pr_channel_id:
+        description: 'Slack channel ID for PR notifications'
+        required: true
+        type: string
+      release_channel:
+        description: 'Release channel (alpha/beta/stable)'
+        required: false
+        type: string
+        default: 'alpha'
+    secrets:
+      RIMORI_TOKEN:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+      PAT_TOKEN:
+        required: true
+      OPENAI_API_KEY:
+        required: true
+
+jobs:
+  lint-and-build:
+    name: Lint and Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: yarn.lock
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: TypeScript check
+        run: yarn run check
+
+      - name: Run linter
+        run: yarn lint
+
+      - name: Build worker
+        run: yarn build:worker
+
+      - name: Build application
+        run: yarn build
+
+      - name: Install Playwright browsers
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run tests
+        run: yarn test
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+
+  notify-build-failure:
+    name: Notify Build Failure
+    needs: lint-and-build
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification - Build Failure
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ inputs.slack_channel_id }}
+          payload: |
+            {
+              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "The weekly release pipeline for ${{ inputs.plugin_name }} Plugin has failed due to lint/build failures. The release cannot proceed until all issues are fixed."
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Pipeline Run>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\nBlocked - Release cannot proceed"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* Review the build failures, fix the issues, and retrigger the pipeline after resolving them."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  prepare-release:
+    name: Prepare Weekly Release
+    needs: lint-and-build
+    runs-on: ubuntu-latest
+    outputs:
+      release_branch: ${{ steps.branch.outputs.name }}
+      changelog: ${{ steps.changelog.outputs.content }}
+      date: ${{ steps.date.outputs.value }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: yarn.lock
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Get release date
+        id: date
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          echo "value=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Capture changelog from stdout (status messages go to stderr)
+          CHANGELOG=$(node scripts/generate-weekly-changelog.cjs)
+          {
+            echo "content<<CHANGELOG_EOF"
+            echo "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create release branch
+        id: branch
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH_NAME="release/weekly-${DATE}"
+          git checkout -b "${BRANCH_NAME}"
+          echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Configure Git credentials for PAT
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Push release branch
+        run: git push origin ${{ steps.branch.outputs.name }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        id: create-pr
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          branch: ${{ steps.branch.outputs.name }}
+          base: main
+          commit-message: 'chore: weekly release ${{ steps.date.outputs.value }}'
+          title: 'Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}'
+          body: |
+            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}
+
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+
+            **Automated Release**
+            - Date: ${{ steps.date.outputs.value }}
+            - Branch: ${{ steps.branch.outputs.name }}
+            - Release Channel: ${{ inputs.release_channel }}
+
+            **Please review and merge this PR to proceed with the release.**
+          labels: release,weekly-deployment
+          delete-branch: false
+
+      - name: Send Slack notification - PR Created
+        if: steps.create-pr.outputs.pull-request-number != ''
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ inputs.slack_pr_channel_id }}
+          payload: |
+            {
+              "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release PR Ready for Review",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release PR Ready for Review"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "A new weekly release pull request for ${{ inputs.plugin_name }} Plugin is ready for review and approval."
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Date:*\n${{ steps.date.outputs.value }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n`${{ steps.branch.outputs.name }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pull-request-number }}|View PR #${{ steps.create-pr.outputs.pull-request-number }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\nReady for Review"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "💡 *Tip:* React with 👍 if you're taking care of reviewing this PR."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
