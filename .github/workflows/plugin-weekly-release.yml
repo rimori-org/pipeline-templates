@@ -169,6 +169,12 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: Configure Git credentials for PAT
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+
       - name: Fetch branches
         run: |
           git fetch origin main:main
@@ -186,12 +192,6 @@ jobs:
       - name: Merge dev into release branch
         run: |
           git merge origin/dev --no-edit
-
-      - name: Configure Git credentials for PAT
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
 
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
