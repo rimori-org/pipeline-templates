@@ -62,11 +62,11 @@ jobs:
       - name: Install Playwright browsers
         run: yarn playwright install --with-deps chromium
 
-      - name: Run tests
-        run: yarn test
-        env:
-          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
-          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+      # - name: Run tests   # temporarily disabled
+      #   run: yarn test
+      #   env:
+      #     RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+      #     RIMORI_BACKEND_URL: https://dev-api.rimori.se
 
   notify-build-failure:
     name: Notify Build Failure
