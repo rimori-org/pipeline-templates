@@ -27,11 +27,11 @@ env:
   SLACK_PR_CHANNEL_ID: C09VCT4JFU4
 
 jobs:
-  lint-and-build:
-    name: Lint and Build
+  lint-build-test:
+    name: Lint, Build, and Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -56,25 +56,23 @@ jobs:
       - name: Build application
         run: yarn build
 
+      # - name: Run tests
+      #   run: yarn test
+
       - name: Install Playwright browsers
         run: yarn playwright install --with-deps chromium
 
-  notify-build-failure:
-    name: Notify Build Failure
-    needs: lint-and-build
-    if: failure()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Slack notification - Build Failure
+      - name: Fail Slack Notification
+        if: failure()
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed",
+              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build or Tests Failed",
               "blocks": [
-                { "type": "header", "text": { "type": "plain_text", "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed" } },
-                { "type": "section", "text": { "type": "mrkdwn", "text": "The weekly release pipeline for ${{ inputs.plugin_name }} Plugin has failed due to lint/build failures. The release cannot proceed until all issues are fixed." } }
+                { "type": "header", "text": { "type": "plain_text", "text": "❌ Build/Tests Failed" } },
+                { "type": "section", "text": { "type": "mrkdwn", "text": "Check the pipeline run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" } }
               ]
             }
         env:
@@ -82,7 +80,8 @@ jobs:
 
   prepare-release:
     name: Prepare Weekly Release
-    needs: lint-and-build
+    needs: lint-build-test
+    if: success()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -96,11 +95,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: yarn.lock
-          registry-url: "https://registry.npmjs.org"
 
-      - name: Configure Git credentials for PAT
+      - name: Configure Git
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -108,50 +104,39 @@ jobs:
 
       - name: Fetch branches
         run: |
-          git fetch origin main
           git fetch origin dev
+          git fetch origin main
 
-      - name: Get release date
-        id: date
-        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
-
-      - name: Create release branch from dev
+      - name: Create release branch
         id: branch
         run: |
+          DATE=$(date +%Y-%m-%d)
           RELEASE_BRANCH="release/weekly-${DATE}"
           git checkout dev
           git pull origin dev
           git checkout -b "$RELEASE_BRANCH"
           echo "RELEASE_BRANCH=$RELEASE_BRANCH" >> $GITHUB_ENV
 
-      - name: Get current version from main
-        id: current_version
+      - name: Bump version
+        id: version
         run: |
           git checkout main
           git pull origin main
-          VERSION=$(node -p "require('./package.json').version")
-          echo "CURRENT_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Determine next version
-        id: next_version
-        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-
-      - name: Update package version
-        run: |
           npm version $NEW_VERSION --no-git-tag-version
           git add package.json
           [ -f package-lock.json ] && git add package-lock.json
           [ -f yarn.lock ] && git add yarn.lock
           git commit -m "chore: bump version to $NEW_VERSION"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Push release branch
-        run: git push origin $RELEASE_BRANCH
+        run: git push origin ${{ env.RELEASE_BRANCH }}
 
-      - name: Generate changelog
+      - name: Generate Changelog
         id: changelog
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -162,16 +147,16 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Create Pull Request via API
+      - name: Create Pull Request via GitHub API
         id: create_pr
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           API_JSON=$(jq -n \
             --arg title "Weekly Release: ${{ inputs.plugin_name }} Plugin - $NEW_VERSION" \
-            --arg head "$RELEASE_BRANCH" \
+            --arg head "${{ env.RELEASE_BRANCH }}" \
             --arg base "main" \
-            --arg body "## Weekly Release: ${{ inputs.plugin_name }} Plugin - $NEW_VERSION\n\n$CHANGELOG\n\nAutomated release via CI." \
+            --arg body "## Weekly Release: ${{ inputs.plugin_name }} Plugin - $NEW_VERSION\n\n$CHANGELOG\n\nAutomated PR via CI." \
             '{title: $title, head: $head, base: $base, body: $body, maintainer_can_modify: true}')
           
           PR_RESPONSE=$(curl -s -X POST \
@@ -184,27 +169,16 @@ jobs:
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           echo "Created PR #$PR_NUMBER"
 
-      - name: Merge Pull Request via API
-        if: env.PR_NUMBER != 'null'
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          curl -s -X PUT \
-            -H "Authorization: token $PAT_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/$PR_NUMBER/merge \
-            -d '{"merge_method":"squash"}' | jq
-
-      - name: Send Slack notification - PR Created
+      - name: Notify Slack for PR Approval
         if: env.PR_NUMBER != 'null'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
           payload: |
             {
-              "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release PR Merged",
+              "text": "🟢 Weekly Release PR Created",
               "blocks": [
-                { "type": "section", "text": { "type": "mrkdwn", "text": "Weekly release PR #${{ env.PR_NUMBER }} has been merged into main." } }
+                { "type": "section", "text": { "type": "mrkdwn", "text": "Weekly release PR #${{ env.PR_NUMBER }} for ${{ inputs.plugin_name }} has been created. Please review and approve." } }
               ]
             }
         env:
