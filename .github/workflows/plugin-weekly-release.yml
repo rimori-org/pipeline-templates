@@ -177,25 +177,30 @@ jobs:
 
       - name: Fetch branches
         run: |
-          # Checkout main first to avoid conflicts
-          git checkout main || git checkout -b main origin/main
           # Fetch latest changes
           git fetch origin main
           git fetch origin dev
 
-      - name: Create release branch from main
+      - name: Create release branch from dev
         id: branch
         run: |
           DATE=$(date +%Y-%m-%d)
           BRANCH_NAME="release/weekly-${DATE}"
-          git checkout main
-          git pull origin main
+          git checkout dev
+          git pull origin dev
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Merge dev into release branch
+      - name: Ensure branch has differences from main
         run: |
-          git merge origin/dev --no-edit
+          # Check if dev has commits ahead of main
+          COMMITS_AHEAD=$(git rev-list --left-right --count origin/main...origin/dev | awk '{print $2}' || echo "0")
+          if [ "$COMMITS_AHEAD" -eq 0 ]; then
+            echo "No commits in dev ahead of main, creating empty commit to ensure PR can be created"
+            git commit --allow-empty -m "chore: weekly release ${{ steps.date.outputs.value }}"
+          else
+            echo "Dev has $COMMITS_AHEAD commits ahead of main, no empty commit needed"
+          fi
 
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
