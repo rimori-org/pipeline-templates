@@ -191,16 +191,37 @@ jobs:
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Ensure branch has differences from main
+      - name: Get current version
+        id: current_version
         run: |
-          # Check if dev has commits ahead of main
-          COMMITS_AHEAD=$(git rev-list --left-right --count origin/main...origin/dev | awk '{print $2}' || echo "0")
-          if [ "$COMMITS_AHEAD" -eq 0 ]; then
-            echo "No commits in dev ahead of main, creating empty commit to ensure PR can be created"
-            git commit --allow-empty -m "chore: weekly release ${{ steps.date.outputs.value }}"
-          else
-            echo "Dev has $COMMITS_AHEAD commits ahead of main, no empty commit needed"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "value=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine next version
+        id: version
+        env:
+          CURRENT_VERSION: ${{ steps.current_version.outputs.value }}
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Determined release version: $NEW_VERSION"
+
+      - name: Update package version
+        run: |
+          # Bump version in package.json to ensure there's always a difference from main
+          # This matches rimori-main's approach and ensures the PR can be created
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          git add package.json
+          if [ -f "package-lock.json" ]; then
+            git add package-lock.json
           fi
+          if [ -f "yarn.lock" ]; then
+            git add yarn.lock
+          fi
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          echo "Version bumped to ${{ steps.version.outputs.version }}"
 
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
@@ -212,16 +233,17 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           branch: ${{ steps.branch.outputs.name }}
           base: main
-          commit-message: "chore: weekly release ${{ steps.date.outputs.value }}"
-          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}"
+          commit-message: "chore: bump version to ${{ steps.version.outputs.version }}"
+          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}"
           body: |
-            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.date.outputs.value }}
+            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}
 
             ${{ steps.changelog.outputs.content }}
 
             ---
 
             **Automated Release**
+            - Version: ${{ steps.version.outputs.version }}
             - Date: ${{ steps.date.outputs.value }}
             - Branch: ${{ steps.branch.outputs.name }}
             - Release Channel: ${{ inputs.release_channel }}
