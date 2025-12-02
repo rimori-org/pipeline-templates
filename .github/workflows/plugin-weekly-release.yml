@@ -244,8 +244,7 @@ jobs:
           title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}"
           author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
           committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-          # push-to-fork: false
-          skip-rebase: true
+          push-to-fork: false
           body: |
             ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}
 
