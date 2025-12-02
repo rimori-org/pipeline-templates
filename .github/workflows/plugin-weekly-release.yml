@@ -1,129 +1,3 @@
-name: Plugin Weekly Release
-
-on:
-  workflow_call:
-    inputs:
-      plugin_name:
-        description: "Name of the plugin (e.g., flashcards)"
-        required: true
-        type: string
-      release_channel:
-        description: "Release channel (alpha/beta/stable)"
-        required: false
-        type: string
-        default: "alpha"
-    secrets:
-      RIMORI_TOKEN:
-        required: true
-      SLACK_BOT_TOKEN:
-        required: true
-      OPENAI_API_KEY:
-        required: true
-      PAT_TOKEN:
-        required: true
-
-env:
-  SLACK_CHANNEL_ID: C09FDPQ8XPB
-  SLACK_PR_CHANNEL_ID: C09VCT4JFU4
-
-jobs:
-  lint-and-build:
-    name: Lint and Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: yarn.lock
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: TypeScript check
-        run: yarn run check
-
-      # - name: Run linter - disabled for now because the linting takes more then 45min with the flashcard plugin
-      #   run: yarn lint
-
-      - name: Build worker
-        run: yarn build:worker
-
-      - name: Build application
-        run: yarn build
-
-      - name: Install Playwright browsers
-        run: yarn playwright install --with-deps chromium
-
-      # - name: Run tests   # temporarily disabled
-      #   run: yarn test
-      #   env:
-      #     RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
-      #     RIMORI_BACKEND_URL: https://dev-api.rimori.se
-
-  notify-build-failure:
-    name: Notify Build Failure
-    needs: lint-and-build
-    if: failure()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Slack notification - Build Failure
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
-          payload: |
-            {
-              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build Failed"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "The weekly release pipeline for ${{ inputs.plugin_name }} Plugin has failed due to lint/build failures. The release cannot proceed until all issues are fixed."
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Pipeline Run>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Status:*\nBlocked - Release cannot proceed"
-                    }
-                  ]
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "⚠️ *Action Required:* Review the build failures, fix the issues, and retrigger the pipeline after resolving them."
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
   prepare-release:
     name: Prepare Weekly Release
     needs: lint-and-build
@@ -132,6 +6,9 @@ jobs:
       release_branch: ${{ steps.branch.outputs.name }}
       changelog: ${{ steps.changelog.outputs.content }}
       date: ${{ steps.date.outputs.value }}
+      pull_request_number: ${{ steps.create_pr_step.outputs.pull_request_number }}
+      pull_request_url: ${{ steps.create_pr_step.outputs.pull_request_url }}
+      pr_merged: ${{ steps.merge_pr_step.outputs.pr_merged }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -159,9 +36,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          # Checkout dev to generate changelog from dev branch
           git checkout dev
-          # Capture changelog from stdout (status messages go to stderr)
           CHANGELOG=$(node scripts/generate-weekly-changelog.cjs)
           {
             echo "content<<CHANGELOG_EOF"
@@ -177,14 +52,12 @@ jobs:
 
       - name: Fetch branches
         run: |
-          # Fetch latest changes
           git fetch origin main
           git fetch origin dev
 
       - name: Get current version from main
         id: current_version
         run: |
-          # Get version from main branch to ensure we bump from the correct base
           git checkout main
           git pull origin main
           CURRENT_VERSION=$(node -p "require('./package.json').version")
@@ -214,8 +87,6 @@ jobs:
 
       - name: Update package version
         run: |
-          # Bump version in package.json to ensure there's always a difference from main
-          # This matches rimori-main's approach and ensures the PR can be created
           npm version ${{ steps.version.outputs.version }} --no-git-tag-version
           git add package.json
           if [ -f "package-lock.json" ]; then
@@ -230,38 +101,122 @@ jobs:
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        id: create-pr
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
-          branch: ${{ steps.branch.outputs.name }}
-          base: main
-          labels: release,weekly-deployment
-          delete-branch: false
-          draft: false
-          commit-message: "chore: bump version to ${{ steps.version.outputs.version }}"
-          title: "Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}"
-          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-          committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-          push-to-fork: false
-          body: |
-            ## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}
+      - name: Install jq (used for JSON parsing)
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-            ${{ steps.changelog.outputs.content }}
+      - name: Debug: show diff vs main (logs)
+        run: |
+          git fetch origin main
+          echo "==== commits on ${BRANCH_NAME:-${{ steps.branch.outputs.name }}} not in main ===="
+          git log --oneline origin/main..${{ steps.branch.outputs.name }} || true
+          echo "==== diff stat ===="
+          git --no-pager diff --stat origin/main..${{ steps.branch.outputs.name }} || true
 
-            ---
+      - name: Create Pull Request via REST API
+        id: create_pr_step
+        env:
+          GITHUB_API: https://api.github.com
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+          PAT: ${{ secrets.PAT_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          # Normalize REPO to "owner/repo"
+          REPO_FULL="${{ github.repository }}"   # e.g. rimori-org/rimori-plugin-flashcards
+          OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${REPO_FULL#*/}"
 
-            **Automated Release**
-            - Version: ${{ steps.version.outputs.version }}
-            - Date: ${{ steps.date.outputs.value }}
-            - Branch: ${{ steps.branch.outputs.name }}
-            - Release Channel: ${{ inputs.release_channel }}
+          # Prepare payload
+          TITLE="Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}"
+          BODY=$(cat <<EOF
+## Weekly Release: ${{ inputs.plugin_name }} Plugin - ${{ steps.version.outputs.version }}
 
-            **Please review and merge this PR to proceed with the release.**
+${{ steps.changelog.outputs.content }}
 
-      - name: Send Slack notification - PR Created
-        if: steps.create-pr.outputs.pull-request-number != ''
+---
+
+**Automated Release**
+- Version: ${{ steps.version.outputs.version }}
+- Date: ${{ steps.date.outputs.value }}
+- Branch: ${{ steps.branch.outputs.name }}
+- Release Channel: ${{ inputs.release_channel }}
+
+**Please review and merge this PR to proceed with the release.**
+EOF
+)
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg head "$OWNER:${{ steps.branch.outputs.name }}" \
+            --arg base "main" \
+            --arg body "$BODY" \
+            '{title:$title, head:$head, base:$base, body:$body}')
+
+          echo "Creating PR for head=${OWNER}:${{ steps.branch.outputs.name }} -> base=main"
+
+          # Try creating the PR
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: token ${PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API}/repos/${OWNER}/${REPO_NAME}/pulls" \
+            -d "$PAYLOAD")
+
+          BODY_RESPONSE=$(echo "$HTTP_RESPONSE" | sed -n '1,$p' | sed '$d')
+          HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -n1)
+
+          echo "HTTP code: $HTTP_CODE"
+          echo "Response body: $BODY_RESPONSE" | sed -n '1,200p'
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            PR_NUMBER=$(echo "$BODY_RESPONSE" | jq -r '.number')
+            PR_URL=$(echo "$BODY_RESPONSE" | jq -r '.html_url')
+            echo "PR created: #${PR_NUMBER} ${PR_URL}"
+            echo "pull_request_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pull_request_url=$PR_URL" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If PR already exists, GitHub returns 422 with message "A pull request already exists for ...".
+          if [ "$HTTP_CODE" = "422" ]; then
+            echo "PR may already exist. Searching open PRs for this branch..."
+            # Query open PRs with head=owner:branch
+            SEARCH_RESPONSE=$(curl -s -H "Authorization: token ${PAT}" -H "Accept: application/vnd.github+json" \
+              "${GITHUB_API}/repos/${OWNER}/${REPO_NAME}/pulls?state=open&head=${OWNER}%3A${{ steps.branch.outputs.name }}&base=main")
+            COUNT=$(echo "$SEARCH_RESPONSE" | jq 'length')
+            if [ "$COUNT" -gt 0 ]; then
+              PR_NUMBER=$(echo "$SEARCH_RESPONSE" | jq -r '.[0].number')
+              PR_URL=$(echo "$SEARCH_RESPONSE" | jq -r '.[0].html_url')
+              echo "Found existing open PR: #${PR_NUMBER} ${PR_URL}"
+              echo "pull_request_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+              echo "pull_request_url=$PR_URL" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            # Also check closed PRs (maybe it exists but was closed)
+            CLOSED_RESPONSE=$(curl -s -H "Authorization: token ${PAT}" -H "Accept: application/vnd.github+json" \
+              "${GITHUB_API}/repos/${OWNER}/${REPO_NAME}/pulls?state=closed&head=${OWNER}%3A${{ steps.branch.outputs.name }}&base=main")
+            COUNT_CLOSED=$(echo "$CLOSED_RESPONSE" | jq 'length')
+            if [ "$COUNT_CLOSED" -gt 0 ]; then
+              PR_NUMBER=$(echo "$CLOSED_RESPONSE" | jq -r '.[0].number')
+              PR_URL=$(echo "$CLOSED_RESPONSE" | jq -r '.[0].html_url')
+              echo "Found existing closed PR: #${PR_NUMBER} ${PR_URL}"
+              echo "pull_request_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+              echo "pull_request_url=$PR_URL" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            echo "422 returned but no existing PR found. Response:"
+            echo "$BODY_RESPONSE"
+            exit 1
+          fi
+
+          # Other errors -> print and fail
+          echo "Failed to create PR (HTTP $HTTP_CODE). Response:"
+          echo "$BODY_RESPONSE"
+          exit 1
+
+      - name: Send Slack notification - PR Created (if created or found)
+        if: steps.create_pr_step.outputs.pull_request_number != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
@@ -296,7 +251,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Pull Request:*\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pull-request-number }}|View PR #${{ steps.create-pr.outputs.pull-request-number }}>"
+                      "text": "*Pull Request:*\n<${{ steps.create_pr_step.outputs.pull_request_url }}|View PR #${{ steps.create_pr_step.outputs.pull_request_number }}>"
                     },
                     {
                       "type": "mrkdwn",
@@ -306,13 +261,102 @@ jobs:
                 },
                 {
                   "type": "divider"
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Merge Pull Request via REST API
+        id: merge_pr_step
+        env:
+          GITHUB_API: https://api.github.com
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+          PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -z "${{ steps.create_pr_step.outputs.pull_request_number }}" ]; then
+            echo "No pull_request_number output from create_pr_step — nothing to merge."
+            echo "pr_merged=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          PR_NUMBER="${{ steps.create_pr_step.outputs.pull_request_number }}"
+          REPO_FULL="${{ github.repository }}"
+          OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${REPO_FULL#*/}"
+
+          echo "Attempting to merge PR #${PR_NUMBER}..."
+
+          # Attempt automatic merge. If not mergeable, the API will provide a message.
+          MERGE_PAYLOAD=$(jq -n --arg title "Merge PR #${PR_NUMBER} - weekly release" --arg msg "Merging weekly release PR" '{commit_title:$title, commit_message:$msg, merge_method:"merge"}')
+
+          MERGE_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+            -H "Authorization: token ${PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API}/repos/${OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}/merge" \
+            -d "$MERGE_PAYLOAD")
+
+          MERGE_BODY=$(echo "$MERGE_RESPONSE" | sed -n '1,$p' | sed '$d')
+          MERGE_CODE=$(echo "$MERGE_RESPONSE" | tail -n1)
+
+          echo "Merge HTTP code: $MERGE_CODE"
+          echo "Merge response: $MERGE_BODY"
+
+          if [ "$MERGE_CODE" = "200" ]; then
+            echo "PR #${PR_NUMBER} merged successfully."
+            echo "pr_merged=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If merge failed, report and post slack notification and fail the job
+          echo "Automatic merge failed (HTTP ${MERGE_CODE}). Merge response: $MERGE_BODY"
+
+          # Create a Slack message indicating manual intervention required
+          SLACK_MSG=$(jq -n --arg pr "https://github.com/${{ github.repository }}/pull/${PR_NUMBER}" --arg text "Automatic merge failed for PR #${PR_NUMBER}. Manual merge required." '{text: $text, blocks: [{type:"section", text:{type:"mrkdwn", text: ("*Automatic merge failed for PR:* " + $pr)}},{type:"section", text:{type:"mrkdwn", text:"Please check the PR and merge manually (possible conflicts or branch protection)."}}]}')
+
+          curl -s -X POST -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" -H "Content-type: application/json" \
+            --data "$SLACK_MSG" https://slack.com/api/chat.postMessage > /dev/null || true
+
+          echo "pr_merged=false" >> $GITHUB_OUTPUT
+          # Fail the step so the pipeline does not erroneously continue
+          exit 1
+
+      - name: Send Slack notification - PR Merged
+        if: steps.merge_pr_step.outputs.pr_merged == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release Merged",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ ${{ inputs.plugin_name }} Plugin Weekly Release Merged"
+                  }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "💡 *Tip:* React with 👍 if you're taking care of reviewing this PR."
+                    "text": "The weekly release PR for ${{ inputs.plugin_name }} Plugin has been merged into `main`."
                   }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*PR:*\n<${{ steps.create_pr_step.outputs.pull_request_url }}|View PR #${{ steps.create_pr_step.outputs.pull_request_number }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\nMerged"
+                    }
+                  ]
                 }
               ]
             }
