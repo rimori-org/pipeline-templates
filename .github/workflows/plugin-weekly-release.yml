@@ -17,8 +17,6 @@ on:
         required: true
       SLACK_BOT_TOKEN:
         required: true
-      PAT_TOKEN:
-        required: true
       OPENAI_API_KEY:
         required: true
 
@@ -34,7 +32,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -139,8 +136,7 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN }}
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -177,11 +173,10 @@ jobs:
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Configure Git credentials for PAT
+      - name: Configure Git credentials
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
 
       - name: Push release branch
         run: git push origin ${{ steps.branch.outputs.name }}
@@ -190,7 +185,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         id: create-pr
         with:
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ github.token }}
           branch: ${{ steps.branch.outputs.name }}
           base: main
           commit-message: "chore: weekly release ${{ steps.date.outputs.value }}"
