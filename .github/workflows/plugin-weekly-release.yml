@@ -136,7 +136,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: dev
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
@@ -160,6 +159,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          # Checkout dev to generate changelog from dev branch
+          git checkout dev
           # Capture changelog from stdout (status messages go to stderr)
           CHANGELOG=$(node scripts/generate-weekly-changelog.cjs)
           {
@@ -168,13 +169,23 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create release branch from dev
+      - name: Fetch branches
+        run: |
+          git fetch origin main:main
+          git fetch origin dev:dev
+
+      - name: Create release branch from main
         id: branch
         run: |
           DATE=$(date +%Y-%m-%d)
           BRANCH_NAME="release/weekly-${DATE}"
+          git checkout main
           git checkout -b "${BRANCH_NAME}"
           echo "name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Merge dev into release branch
+        run: |
+          git merge origin/dev --no-edit
 
       - name: Configure Git credentials for PAT
         run: |

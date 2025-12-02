@@ -12,6 +12,8 @@ on:
         required: true
       SLACK_BOT_TOKEN:
         required: true
+      PAT_TOKEN:
+        required: true
 
 jobs:
   release:
@@ -23,6 +25,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -99,6 +104,39 @@ jobs:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
         run: yarn rimori-release stable
+
+      - name: Sync main back to dev
+        if: success()
+        run: |
+          echo "Syncing main branch back to dev..."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+
+          # Fetch all branches
+          git fetch origin dev:dev
+
+          # Checkout dev and merge main into it
+          git checkout dev
+          git merge origin/main --no-edit -m "chore: sync main back to dev after production release"
+          git push origin dev
+
+          echo "Successfully synced main back to dev"
+
+      - name: Delete merged release branches
+        if: success()
+        continue-on-error: true
+        run: |
+          # Find and delete any release branches that were merged
+          RELEASE_BRANCHES=$(git branch -r --merged origin/main | grep 'origin/release/' | sed 's/origin\///' || true)
+          if [ -n "$RELEASE_BRANCHES" ]; then
+            for branch in $RELEASE_BRANCHES; do
+              echo "Deleting merged release branch: $branch"
+              git push origin --delete "$branch" || true
+            done
+          else
+            echo "No release branches to clean up"
+          fi
 
       - name: Send Slack notification - Success
         if: success()
