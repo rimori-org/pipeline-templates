@@ -56,11 +56,11 @@ jobs:
       - name: Build application
         run: yarn build
 
-      - name: Run tests
-        run: yarn test
-
       - name: Install Playwright browsers
         run: yarn playwright install --with-deps chromium
+
+      - name: Run tests
+        run: yarn test
 
       - name: Fail Slack Notification
         if: failure()
@@ -158,13 +158,13 @@ jobs:
             --arg base "main" \
             --arg body "## Weekly Release: ${{ inputs.plugin_name }} Plugin - $NEW_VERSION\n\n$CHANGELOG\n\nAutomated PR via CI." \
             '{title: $title, head: $head, base: $base, body: $body, maintainer_can_modify: true}')
-          
+
           PR_RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $PAT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls \
             -d "$API_JSON")
-          
+
           PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r .number)
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           echo "Created PR #$PR_NUMBER"
