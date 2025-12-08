@@ -118,26 +118,26 @@ jobs:
         run: yarn rimori-release alpha
 
       - name: Notify Slack
-        if: always()
+        if: job.status != 'cancelled' && (success() || failure())
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || '✅ Plugin Release') || '❌ Pipeline Failed' }}",
+              "text": "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || format('✅ {0} Plugin Release', inputs.plugin_name)) || format('❌ {0} Plugin Release Failed', inputs.plugin_name) }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || 'Plugin Release' }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }}) ${{ job.status == 'success' && 'Succeeded' || 'Failed' }}"
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || format('{0} Plugin Release', inputs.plugin_name) }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }}) ${{ job.status == 'success' && 'Succeeded' || 'Failed' }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ github.event_name == 'push' && format('*Dependencies:*\n  @rimori/client: {0}\n  @rimori/react-client: {1}\n  @rimori/playwright-testing: {2}\n\n', steps.versions.outputs.client_version, steps.versions.outputs.react_client_version, steps.versions.outputs.playwright_version) || '' }}*Pipeline:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
                   }
                 }
               ]

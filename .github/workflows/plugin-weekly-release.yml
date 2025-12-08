@@ -72,7 +72,7 @@ jobs:
               "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build or Tests Failed",
               "blocks": [
                 { "type": "header", "text": { "type": "plain_text", "text": "❌ Build/Tests Failed" } },
-                { "type": "section", "text": { "type": "mrkdwn", "text": "Check the pipeline run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" } }
+                { "type": "section", "text": { "type": "mrkdwn", "text": "Check the workflow run for details: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" } }
               ]
             }
         env:
