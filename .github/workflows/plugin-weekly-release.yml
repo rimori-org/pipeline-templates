@@ -170,15 +170,90 @@ jobs:
           echo "Created PR #$PR_NUMBER"
 
       - name: Notify Slack for PR Approval
-        if: env.PR_NUMBER != 'null'
+        if: success() && env.PR_NUMBER != 'null'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
           payload: |
             {
-              "text": "🟢 Weekly Release PR Created",
+              "text": "🔔 Weekly Release PR Ready for Review - ${{ inputs.plugin_name }} Plugin",
               "blocks": [
-                { "type": "section", "text": { "type": "mrkdwn", "text": "Weekly release PR #${{ env.PR_NUMBER }} for ${{ inputs.plugin_name }} has been created. Please review and approve." } }
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔔 Weekly Release PR Ready for Review"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Plugin:*\n${{ inputs.plugin_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ env.NEW_VERSION }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ env.RELEASE_BRANCH }} → main"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*PR Number:*\n#${{ env.PR_NUMBER }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "📋 *Action Required:* Please review and approve the PR to proceed with the production release.\n\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View Pull Request>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release Preparation Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Weekly Release Preparation Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Plugin:*\n${{ inputs.plugin_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\nWeekly Release"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* The release preparation failed during branch creation, version bump, changelog generation, or PR creation.\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                  }
+                }
               ]
             }
         env:
