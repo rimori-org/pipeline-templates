@@ -45,7 +45,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install
 
       - name: TypeScript check
         run: yarn run check
@@ -95,6 +95,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "yarn"
+          cache-dependency-path: yarn.lock
 
       - name: Configure Git
         run: |
@@ -117,20 +119,32 @@ jobs:
           git checkout -b "$RELEASE_BRANCH"
           echo "RELEASE_BRANCH=$RELEASE_BRANCH" >> $GITHUB_ENV
 
-      - name: Bump version
+      - name: Bump version and update lockfile
         id: version
         run: |
+          # Get current version from main (just to read it)
           git checkout main
           git pull origin main
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          # Switch to release branch to make changes there
+          git checkout ${{ env.RELEASE_BRANCH }}
+
+          # Bump version on release branch
           npm version $NEW_VERSION --no-git-tag-version
+
+          # Regenerate lockfile to ensure it's up to date
+          echo "Regenerating yarn.lock to ensure consistency..."
+          yarn install
+
+          # Commit version bump and lockfile
           git add package.json
           [ -f package-lock.json ] && git add package-lock.json
           [ -f yarn.lock ] && git add yarn.lock
-          git commit -m "chore: bump version to $NEW_VERSION"
+          git commit -m "chore: bump version to $NEW_VERSION and update lockfile"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Push release branch
