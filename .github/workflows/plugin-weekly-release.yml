@@ -147,13 +147,13 @@ jobs:
           # Bump version on release branch
           npm version $NEW_VERSION --no-git-tag-version
 
+          # Sync lockfile with updated package.json version
+          echo "Syncing yarn.lock with new version..."
+          yarn install
+
           # Upgrade Rimori packages to latest versions
           echo "Upgrading Rimori packages to latest versions..."
           yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client --latest
-
-          # Regenerate lockfile to ensure it's up to date
-          echo "Regenerating yarn.lock to ensure consistency..."
-          yarn install
 
           # Commit version bump and lockfile
           git add package.json
