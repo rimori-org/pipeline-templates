@@ -219,19 +219,11 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*Plugin:*\n${{ inputs.plugin_name }}"
-                    },
-                    {
-                      "type": "mrkdwn",
                       "text": "*Version:*\n${{ env.NEW_VERSION }}"
                     },
                     {
                       "type": "mrkdwn",
                       "text": "*Branch:*\n${{ env.RELEASE_BRANCH }} → main"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*PR Number:*\n#${{ env.PR_NUMBER }}"
                     }
                   ]
                 },
@@ -239,7 +231,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "📋 *Action Required:* Please review and approve the PR to proceed with the production release.\n\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View Pull Request>"
+                    "text": "Like this message if you are taking care of the release.\n\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View Pull Request>"
                   }
                 }
               ]
@@ -269,10 +261,6 @@ jobs:
                     {
                       "type": "mrkdwn",
                       "text": "*Plugin:*\n${{ inputs.plugin_name }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Workflow:*\nWeekly Release"
                     }
                   ]
                 },
@@ -280,7 +268,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "⚠️ *Action Required:* The release preparation failed during branch creation, version bump, changelog generation, or PR creation.\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
                   }
                 }
               ]

@@ -92,19 +92,31 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
 
-          # Fetch dev and main
-          git fetch origin dev
-          git fetch origin main
-
-          # Checkout dev
+          git fetch origin dev main
           git checkout dev
 
-          # Merge main into dev, allow unrelated histories only for the first merge
+          # Attempt merge
+          set +e
           git merge origin/main --allow-unrelated-histories --no-edit -m "chore: sync main back to dev after production release"
+          MERGE_STATUS=$?
+          set -e
 
-          # Push dev back to origin
+          # If merge had conflicts, resolve package.json and yarn.lock by accepting main's version
+          if [ $MERGE_STATUS -ne 0 ] || [ -n "$(git ls-files -u)" ]; then
+            echo "Resolving conflicts in package.json and yarn.lock by accepting main's version..."
+            git checkout --theirs package.json yarn.lock 2>/dev/null || true
+            git add package.json yarn.lock 2>/dev/null || true
+            
+            # Complete the merge if only package.json and yarn.lock had conflicts
+            if [ -z "$(git ls-files -u)" ]; then
+              git commit --no-edit -m "chore: sync main back to dev after production release"
+            else
+              echo "Warning: Other conflicts remain beyond package.json and yarn.lock"
+              exit 1
+            fi
+          fi
+
           git push origin dev
-
           echo "Successfully synced main back to dev"
 
       - name: Delete merged release branches
