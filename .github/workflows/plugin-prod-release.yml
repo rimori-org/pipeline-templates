@@ -103,11 +103,18 @@ jobs:
 
           # If merge had conflicts, resolve package.json, yarn.lock, and package-lock.json by accepting main's version
           if [ $MERGE_STATUS -ne 0 ] || [ -n "$(git ls-files -u)" ]; then
-            echo "Resolving conflicts in package.json, yarn.lock, and package-lock.json by accepting main's version..."
-            git checkout --theirs package.json yarn.lock package-lock.json 2>/dev/null || true
-            git add package.json yarn.lock package-lock.json 2>/dev/null || true
+            echo "Resolving conflicts in package.json and lock files by accepting main's version..."
             
-            # Complete the merge if only package.json and lock files had conflicts
+            # Resolve conflicts for files that exist and have conflicts
+            for file in package.json yarn.lock package-lock.json; do
+              if git ls-files -u | grep -q "$file"; then
+                echo "Resolving conflict in $file..."
+                git checkout --theirs "$file" 2>/dev/null || true
+                git add "$file" 2>/dev/null || true
+              fi
+            done
+            
+            # Complete the merge if all conflicts are resolved
             if [ -z "$(git ls-files -u)" ]; then
               git commit --no-edit -m "chore: sync main back to dev after production release"
             else
