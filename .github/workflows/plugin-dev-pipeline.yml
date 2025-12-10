@@ -71,9 +71,14 @@ jobs:
       - name: Update dependencies to latest pre-releases
         if: github.event_name == 'push'
         run: |
-          yarn add "@rimori/client@${{ steps.versions.outputs.client_version }}" --exact
-          yarn add "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" --exact
-          yarn add "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" --dev --exact
+          # Install all dependencies in a single command to prevent version conflicts
+          # This ensures @rimori/playwright-testing@next is installed before client packages
+          # that might depend on the stable version
+          yarn add \
+            "@rimori/client@${{ steps.versions.outputs.client_version }}" \
+            "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" \
+            "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" \
+            --exact
           echo "Updated dependencies:"
           echo "  @rimori/client: ${{ steps.versions.outputs.client_version }}"
           echo "  @rimori/react-client: ${{ steps.versions.outputs.react_client_version }}"
@@ -81,6 +86,29 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      - name: Verify correct versions installed
+        if: github.event_name == 'push'
+        run: |
+          echo "Verifying installed versions..."
+          INSTALLED_CLIENT=$(node -p "require('./node_modules/@rimori/client/package.json').version")
+          INSTALLED_REACT=$(node -p "require('./node_modules/@rimori/react-client/package.json').version")
+          INSTALLED_PLAYWRIGHT=$(node -p "require('./node_modules/@rimori/playwright-testing/package.json').version")
+
+          echo "Installed versions:"
+          echo "  @rimori/client: $INSTALLED_CLIENT (expected: ${{ steps.versions.outputs.client_version }})"
+          echo "  @rimori/react-client: $INSTALLED_REACT (expected: ${{ steps.versions.outputs.react_client_version }})"
+          echo "  @rimori/playwright-testing: $INSTALLED_PLAYWRIGHT (expected: ${{ steps.versions.outputs.playwright_version }})"
+
+          # Verify playwright-testing version matches (critical for tests)
+          if [ "$INSTALLED_PLAYWRIGHT" != "${{ steps.versions.outputs.playwright_version }}" ]; then
+            echo "❌ ERROR: @rimori/playwright-testing version mismatch!"
+            echo "   Expected: ${{ steps.versions.outputs.playwright_version }}"
+            echo "   Installed: $INSTALLED_PLAYWRIGHT"
+            exit 1
+          fi
+
+          echo "✅ All versions verified correctly"
 
       - name: TypeScript check
         run: yarn run check
