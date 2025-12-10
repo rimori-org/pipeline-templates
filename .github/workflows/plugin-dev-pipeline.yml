@@ -71,6 +71,10 @@ jobs:
       - name: Update dependencies to latest pre-releases
         if: github.event_name == 'push'
         run: |
+          # Clear node_modules to prevent cache conflicts
+          echo "Clearing node_modules to ensure clean install..."
+          rm -rf node_modules
+
           # Install all dependencies in a single command to prevent version conflicts
           # This ensures @rimori/playwright-testing@next is installed before client packages
           # that might depend on the stable version
@@ -85,7 +89,16 @@ jobs:
           echo "  @rimori/playwright-testing: ${{ steps.versions.outputs.playwright_version }}"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          # For push events (dev releases), we just updated dependencies, so don't use frozen-lockfile
+          # For PRs, use frozen-lockfile to ensure reproducible builds
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Installing dependencies after version updates (no frozen lockfile)..."
+            yarn install
+          else
+            echo "Installing dependencies with frozen lockfile..."
+            yarn install --frozen-lockfile
+          fi
 
       - name: Verify correct versions installed
         if: github.event_name == 'push'
