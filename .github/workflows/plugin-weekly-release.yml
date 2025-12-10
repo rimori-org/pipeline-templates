@@ -48,7 +48,7 @@ jobs:
         run: |
           yarn cache clean
           yarn install
-          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client
+          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client --latest
 
       - name: Print dependency versions
         run: |
@@ -149,7 +149,7 @@ jobs:
 
           # Upgrade Rimori packages to latest versions
           echo "Upgrading Rimori packages to latest versions..."
-          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client
+          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client --latest
 
           # Regenerate lockfile to ensure it's up to date
           echo "Regenerating yarn.lock to ensure consistency..."
