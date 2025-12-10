@@ -46,6 +46,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          yarn cache clean
           yarn install
           yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client
 
