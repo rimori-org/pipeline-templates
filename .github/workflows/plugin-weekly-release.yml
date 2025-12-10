@@ -45,7 +45,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: yarn install
+        run: |
+          yarn install
+          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client
 
       - name: Print dependency versions
         run: |
