@@ -47,6 +47,14 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
+      - name: Print dependency versions
+        run: |
+          echo "=== Installed Package Versions ==="
+          echo "rimori-client: $(yarn list --pattern rimori-client --depth=0 2>/dev/null | grep rimori-client@ || echo 'Not installed')"
+          echo "playwright-testing: $(yarn list --pattern playwright-testing --depth=0 2>/dev/null | grep playwright-testing@ || echo 'Not installed')"
+          echo "react-client: $(yarn list --pattern react-client --depth=0 2>/dev/null | grep react-client@ || echo 'Not installed')"
+          echo "=================================="
+
       - name: TypeScript check
         run: yarn run check
 
