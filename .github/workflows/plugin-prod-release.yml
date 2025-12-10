@@ -37,52 +37,6 @@ jobs:
           cache-dependency-path: yarn.lock
           registry-url: "https://registry.npmjs.org"
 
-      - name: Get latest stable versions
-        id: versions
-        run: |
-          # Get @rimori/client@latest
-          CLIENT_VERSION=$(npm view @rimori/client@latest version 2>/dev/null || echo "")
-          if [ -z "$CLIENT_VERSION" ]; then
-            echo "⚠️  Warning: No @rimori/client@latest version found. Using current dependency version."
-            CLIENT_VERSION=$(node -p "require('./package.json').dependencies['@rimori/client']")
-            CLIENT_VERSION="${CLIENT_VERSION#^}"
-          fi
-          echo "client_version=$CLIENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Using @rimori/client version: $CLIENT_VERSION"
-
-          # Get @rimori/react-client@latest
-          REACT_CLIENT_VERSION=$(npm view @rimori/react-client@latest version 2>/dev/null || echo "")
-          if [ -z "$REACT_CLIENT_VERSION" ]; then
-            echo "⚠️  Warning: No @rimori/react-client@latest version found. Using current dependency version."
-            REACT_CLIENT_VERSION=$(node -p "require('./package.json').dependencies['@rimori/react-client']")
-            REACT_CLIENT_VERSION="${REACT_CLIENT_VERSION#^}"
-          fi
-          echo "react_client_version=$REACT_CLIENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Using @rimori/react-client version: $REACT_CLIENT_VERSION"
-
-          # Get @rimori/playwright-testing@latest
-          PLAYWRIGHT_VERSION=$(npm view @rimori/playwright-testing@latest version 2>/dev/null || echo "")
-          if [ -z "$PLAYWRIGHT_VERSION" ]; then
-            echo "⚠️  Warning: No @rimori/playwright-testing@latest version found. Using current dependency version."
-            PLAYWRIGHT_VERSION=$(node -p "require('./package.json').devDependencies['@rimori/playwright-testing']")
-            PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION#^}"
-          fi
-          echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
-          echo "Using @rimori/playwright-testing version: $PLAYWRIGHT_VERSION"
-
-      - name: Restore package.json from git (ignore local changes)
-        run: git checkout HEAD -- package.json
-
-      - name: Update dependencies to latest stable
-        run: |
-          yarn add "@rimori/client@${{ steps.versions.outputs.client_version }}" --exact
-          yarn add "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" --exact
-          yarn add "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" --dev --exact
-          echo "Updated dependencies:"
-          echo "  @rimori/client: ${{ steps.versions.outputs.client_version }}"
-          echo "  @rimori/react-client: ${{ steps.versions.outputs.react_client_version }}"
-          echo "  @rimori/playwright-testing: ${{ steps.versions.outputs.playwright_version }}"
-
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
