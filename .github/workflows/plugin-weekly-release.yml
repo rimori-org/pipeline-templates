@@ -7,11 +7,6 @@ on:
         description: "Name of the plugin (e.g., flashcards)"
         required: true
         type: string
-      release_channel:
-        description: "Release channel (alpha/beta/stable)"
-        required: false
-        type: string
-        default: "alpha"
     secrets:
       RIMORI_TOKEN:
         required: true
@@ -34,6 +29,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 0
 
       - name: Setup Node.js
