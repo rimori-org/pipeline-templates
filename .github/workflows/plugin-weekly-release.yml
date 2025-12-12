@@ -158,8 +158,15 @@ jobs:
           git commit -m "chore: bump version to $NEW_VERSION and update lockfile"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
+      - name: Create git tag
+        run: |
+          git tag -a "v${{ env.NEW_VERSION }}" -m "Release v${{ env.NEW_VERSION }} - ${{ inputs.plugin_name }} plugin"
+
       - name: Push release branch
         run: git push origin ${{ env.RELEASE_BRANCH }}
+
+      - name: Push git tag
+        run: git push origin "v${{ env.NEW_VERSION }}"
 
       - name: Generate Changelog
         id: changelog
