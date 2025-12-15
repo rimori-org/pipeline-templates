@@ -154,13 +154,13 @@ jobs:
           channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "✅ ${{ inputs.plugin_name }} - v${{ env.VERSION }}",
+              "text": "✅ Production release of plugin ${{ inputs.plugin_name }} v${{ env.VERSION }} succeeded",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "✅ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
+                    "text": "✅ Production release of plugin ${{ inputs.plugin_name }} v${{ env.VERSION }} succeeded"
                   }
                 },
                 {
