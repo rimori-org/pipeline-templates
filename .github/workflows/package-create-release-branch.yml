@@ -142,7 +142,7 @@ jobs:
           NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json
+          git add package.json yarn.lock
           if [ "${{ steps.check_package.outputs.update_rimori_client }}" == "true" ]; then
             CLIENT_VERSION="${{ steps.get_client_version.outputs.client_version }}"
             git commit -m "chore: bump version to $NEW_VERSION and update @rimori/client to ^$CLIENT_VERSION"
