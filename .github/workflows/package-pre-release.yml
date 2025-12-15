@@ -141,10 +141,17 @@ jobs:
               "text": "Pre-Release Pipeline Status",
               "blocks": [
                 {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ steps.get_package_name.outputs.package_name }} Pre-Release"
+                  }
+                },
+                {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ job.status == 'success' && '✅' || '❌' }} *${{ steps.get_package_name.outputs.package_name }} Pre-Release*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|🔗 View Pipeline>"
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
                   }
                 }
               ]
