@@ -24,6 +24,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           provenance: true
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Get package name
         id: get_package_name
         run: |
@@ -138,23 +141,6 @@ jobs:
                 },
                 {
                   "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Version:*\nv${{ steps.get_version.outputs.version }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Type:*\nStable + Next"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Branch:*\nmain"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
                   "text": {
                     "type": "mrkdwn",
                     "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
@@ -186,20 +172,9 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*Version:*\nv${{ steps.get_version.outputs.version }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
                     }
                   ]
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "⚠️ *Action Required:* Review the pipeline failures and fix the issues before retrying the release."
-                  }
                 }
               ]
             }

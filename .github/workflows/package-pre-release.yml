@@ -144,7 +144,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "📦 *${{ steps.get_package_name.outputs.package_name }} Pre-Release*\n\n*Branch:* ${{ github.ref_name }}\n*Version:* ${{ steps.version.outputs.new_version }}\n${{ steps.check_package.outputs.update_rimori_client == 'true' && format('*Using @rimori/client:* {0}\n', steps.client-version.outputs.version) || '' }}*Author:* ${{ github.actor }}\n*Pipeline:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\n\n${{ job.status == 'success' && '✅ Successfully published to npm with @next tag!' || '❌ Pipeline failed. Check the logs for details.' }}"
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} *${{ steps.get_package_name.outputs.package_name }} Pre-Release*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|🔗 View Pipeline>"
                   }
                 }
               ]
