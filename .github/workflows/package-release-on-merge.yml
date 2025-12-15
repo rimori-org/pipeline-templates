@@ -22,7 +22,6 @@ jobs:
           node-version: '20'
           cache: 'yarn'
           registry-url: 'https://registry.npmjs.org'
-          provenance: true
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -91,7 +90,7 @@ jobs:
       - name: Publish to npm (stable)
         id: npm_publish
         run: |
-          npm publish --provenance --access public --tag latest
+          npm publish --access public --tag latest
 
       - name: Publish to npm (next)
         id: npm_publish_next
@@ -103,7 +102,7 @@ jobs:
           node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.version = '$NEXT_VERSION'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');"
           
           # Publish with next tag
-          npm publish --provenance --access public --tag next
+          npm publish --access public --tag next
           
           # Restore original version (don't commit)
           git checkout package.json
