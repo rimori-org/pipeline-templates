@@ -208,33 +208,20 @@ jobs:
           channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
           payload: |
             {
-              "text": "🔔 Weekly Release PR Ready for Review - ${{ inputs.plugin_name }} Plugin",
+              "text": "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🔔 Weekly Release PR Ready for Review"
+                    "text": "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}"
                   }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Version:*\n${{ env.NEW_VERSION }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Branch:*\n${{ env.RELEASE_BRANCH }} → main"
-                    }
-                  ]
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Like this message if you are taking care of the release.\n\n<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View Pull Request>"
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View PR>"
                   }
                 }
               ]
