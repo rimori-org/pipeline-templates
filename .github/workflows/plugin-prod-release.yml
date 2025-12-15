@@ -58,6 +58,12 @@ jobs:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
 
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       # Beta channel releases
       - name: Release Beta to Dev Environment
         env:
@@ -148,31 +154,14 @@ jobs:
           channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "✅ ${{ inputs.plugin_name }} Plugin Production Release",
+              "text": "✅ ${{ inputs.plugin_name }} - v${{ env.VERSION }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "✅ ${{ inputs.plugin_name }} Plugin Production Release (main) Succeeded"
+                    "text": "✅ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
                   }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Branch:*\nmain"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Release Channels:*\nBeta + Stable"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Environments:*\nDev + Production"
-                    }
-                  ]
                 },
                 {
                   "type": "section",
@@ -193,33 +182,20 @@ jobs:
           channel-id: ${{ env.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "❌ ${{ inputs.plugin_name }} Plugin Production Release Failed",
+              "text": "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "❌ ${{ inputs.plugin_name }} Plugin Production Release (main) Failed"
+                    "text": "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
                   }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Branch:*\nmain"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-                    }
-                  ]
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "⚠️ *Action Required:* Review the pipeline failures and fix the issues before retrying the release."
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
                   }
                 }
               ]
