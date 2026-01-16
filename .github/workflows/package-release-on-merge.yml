@@ -109,6 +109,17 @@ jobs:
           
           echo "Published version: $NEXT_VERSION with tag 'next'"
 
+      - name: Merge main into dev
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main dev
+          git checkout dev
+          git merge --no-ff origin/main -m "chore: merge main into dev"
+          git push origin dev
+
       - name: Delete release branch
         if: success() && github.ref != 'refs/heads/dev'
         run: |
