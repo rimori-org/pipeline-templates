@@ -19,7 +19,8 @@ jobs:
       - name: Detect code changes
         id: detect_changes
         run: |
-          git fetch origin main:main 2>/dev/null || true
+          set -o pipefail
+          git fetch origin main:main
           CHANGE_COUNT=$(git log main..dev --pretty=format:"%H" --no-merges | wc -l)
           if [ "$CHANGE_COUNT" -gt 0 ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
