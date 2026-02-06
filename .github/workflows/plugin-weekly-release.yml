@@ -37,14 +37,13 @@ jobs:
       - name: Detect code changes
         id: detect_changes
         run: |
-          git fetch origin main:main 2>/dev/null || true
-          CHANGE_COUNT=$(git log main..dev --pretty=format:"%H" --no-merges | wc -l)
-          if [ "$CHANGE_COUNT" -gt 0 ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "Detected $CHANGE_COUNT commits since last release."
-          else
+          git fetch origin main:main
+          if git diff --quiet main..dev; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "No commits since last release. Skipping weekly release."
+            echo "No changes since last release. Skipping release branch creation."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Detected changes between main and dev."
           fi
 
   lint-build-test:
