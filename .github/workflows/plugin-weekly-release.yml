@@ -22,29 +22,7 @@ env:
   SLACK_PR_CHANNEL_ID: C09VCT4JFU4
 
 jobs:
-  detect-changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    outputs:
-      has_changes: ${{ steps.detect_changes.outputs.has_changes }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: dev
-          fetch-depth: 0
-
-      - name: Detect code changes
-        id: detect_changes
-        run: |
-          git fetch origin main:main
-          if git diff --quiet main..dev; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "No changes since last release. Skipping release branch creation."
-          else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "Detected changes between main and dev."
-          fi
+  # IMPORTANT: No code change detection should be done here because the rimori packages change frequently and new changes should be released weekly.
 
   lint-build-test:
     name: Lint, Build, and Test
