@@ -58,6 +58,14 @@ jobs:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-production
+          path: test-results/
+          retention-days: 7
+
       - name: Get version
         id: version
         run: |

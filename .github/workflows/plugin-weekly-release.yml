@@ -73,6 +73,14 @@ jobs:
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-weekly-release
+          path: test-results/
+          retention-days: 7
+
       - name: Fail Slack Notification
         if: failure()
         uses: slackapi/slack-github-action@v1.24.0
