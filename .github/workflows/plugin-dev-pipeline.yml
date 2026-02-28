@@ -179,7 +179,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || format('{0} Plugin Release', inputs.plugin_name) }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }}) ${{ job.status == 'success' && 'Succeeded' || 'Failed' }}"
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || format('{0} plugin release', inputs.plugin_name) }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }})"
                   }
                 },
                 {

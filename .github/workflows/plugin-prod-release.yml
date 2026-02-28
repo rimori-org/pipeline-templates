@@ -168,7 +168,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "✅ Production release of plugin ${{ inputs.plugin_name }} v${{ env.VERSION }} succeeded"
+                    "text": "✅ Plugin ${{ inputs.plugin_name }} release (prod)"
                   }
                 },
                 {
