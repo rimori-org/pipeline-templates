@@ -111,7 +111,7 @@ jobs:
 
           # Attempt merge
           set +e
-          git merge origin/main --allow-unrelated-histories --no-edit -m "chore: sync main back to dev after production release"
+          git merge origin/main --allow-unrelated-histories --no-edit -m "chore: sync main back to dev after production release [skip ci]"
           MERGE_STATUS=$?
           set -e
 
@@ -130,7 +130,7 @@ jobs:
             
             # Complete the merge if all conflicts are resolved
             if [ -z "$(git ls-files -u)" ]; then
-              git commit --no-edit -m "chore: sync main back to dev after production release"
+              git commit --no-edit -m "chore: sync main back to dev after production release [skip ci]"
             else
               echo "Warning: Other conflicts remain beyond package.json and lock files"
               exit 1

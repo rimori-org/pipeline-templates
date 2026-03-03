@@ -205,6 +205,9 @@ jobs:
           echo "pull-request-url=$PR_URL" >> $GITHUB_OUTPUT
           echo "Created PR: $PR_URL"
 
+          gh pr merge "$PR_URL" --auto --merge
+          echo "Auto-merge enabled on PR"
+
       - name: Send Slack notification to public channel
         if: success()
         uses: slackapi/slack-github-action@v1.24.0

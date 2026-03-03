@@ -117,7 +117,7 @@ jobs:
 
           git fetch origin main dev
           git checkout dev
-          git merge --no-ff origin/main -m "chore: merge main into dev"
+          git merge --no-ff origin/main -m "chore: merge main into dev [skip ci]"
           git push origin dev
 
       - name: Delete release branch
