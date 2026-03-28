@@ -136,18 +136,18 @@ jobs:
         if: github.event_name == 'push'
         run: yarn playwright install --with-deps chromium
 
-      - name: Run tests
+      - name: Run scenario tests
         if: github.event_name == 'push'
-        run: yarn test
+        run: yarn playwright test 'test/**/*.test.ts'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
 
-      - name: Upload test results
+      - name: Upload scenario test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-dev
+          name: scenario-test-results
           path: test-results/
           retention-days: 7
 
@@ -165,6 +165,26 @@ jobs:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
         run: yarn rimori-release alpha
+
+      - name: Run E2E tests
+        if: github.event_name == 'push'
+        run: |
+          if [ -d "test/e2e" ]; then
+            yarn playwright test test/e2e/
+          else
+            echo "No E2E tests found, skipping"
+          fi
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 7
 
       - name: Notify Slack
         if: job.status != 'cancelled' && (success() || failure())

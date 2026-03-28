@@ -52,17 +52,17 @@ jobs:
       - name: Install Playwright browsers
         run: yarn playwright install --with-deps chromium
 
-      - name: Run tests
-        run: yarn test
+      - name: Run scenario tests
+        run: yarn playwright test 'test/**/*.test.ts'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
 
-      - name: Upload test results
+      - name: Upload scenario test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-production
+          name: scenario-test-results
           path: test-results/
           retention-days: 7
 
@@ -72,25 +72,44 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Beta channel releases
+      # Deploy to dev first, then validate with E2E before touching prod
       - name: Release Beta to Dev Environment
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
         run: yarn rimori-release beta
 
-      - name: Release Beta to Production Environment
-        env:
-          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
-          RIMORI_BACKEND_URL: https://api.rimori.se
-        run: yarn rimori-release beta
-
-      # Stable channel releases
       - name: Release Stable to Dev Environment
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
         run: yarn rimori-release stable
+
+      - name: Run E2E tests
+        run: |
+          if [ -d "test/e2e" ]; then
+            yarn playwright test test/e2e/
+          else
+            echo "No E2E tests found, skipping"
+          fi
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://dev-api.rimori.se
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 7
+
+      # Production releases - only after E2E tests pass on dev
+      - name: Release Beta to Production Environment
+        env:
+          RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
+          RIMORI_BACKEND_URL: https://api.rimori.se
+        run: yarn rimori-release beta
 
       - name: Release Stable to Production Environment
         env:

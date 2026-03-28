@@ -68,16 +68,16 @@ jobs:
       - name: Install Playwright browsers
         run: yarn playwright install --with-deps chromium
 
-      - name: Run tests
-        run: yarn test
+      - name: Run scenario tests
+        run: yarn playwright test 'test/**/*.test.ts'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
 
-      - name: Upload test results
+      - name: Upload scenario test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-weekly-release
+          name: scenario-test-results
           path: test-results/
           retention-days: 7
 
