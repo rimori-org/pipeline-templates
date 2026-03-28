@@ -53,7 +53,7 @@ jobs:
         run: yarn playwright install --with-deps chromium
 
       - name: Run scenario tests
-        run: yarn playwright test 'test/**/*.test.ts'
+        run: yarn playwright test '\.test\.ts$'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
