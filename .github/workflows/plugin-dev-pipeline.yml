@@ -15,7 +15,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       SLACK_CHANNEL_ID: C09FDPQ8XPB
 
