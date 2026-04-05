@@ -10,7 +10,7 @@ jobs:
       has_changes: ${{ steps.detect_changes.outputs.has_changes }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: dev
@@ -38,13 +38,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "yarn"
@@ -210,71 +210,44 @@ jobs:
 
       - name: Send Slack notification to public channel
         if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: C09VCT4JFU4
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "✅ ${{ steps.get_package_name.outputs.package_name }} ${{ steps.bump_version.outputs.new_version }} is ready for release",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "✅ ${{ steps.get_package_name.outputs.package_name }} ${{ steps.bump_version.outputs.new_version }} is ready for release"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ steps.create_pr.outputs.pull-request-url }}|View PR>"
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: C09VCT4JFU4
+            text: "✅ ${{ steps.get_package_name.outputs.package_name }} ${{ steps.bump_version.outputs.new_version }} is ready for release"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "✅ ${{ steps.get_package_name.outputs.package_name }} ${{ steps.bump_version.outputs.new_version }} is ready for release"
+              - type: section
+                fields:
+                  - type: mrkdwn
+                    text: "<${{ steps.create_pr.outputs.pull-request-url }}|View PR>"
 
       - name: Send Slack notification - Failure
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: C09FDPQ8XPB
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "❌ ${{ steps.get_package_name.outputs.package_name }} Release Branch Creation Failed",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "❌ ${{ steps.get_package_name.outputs.package_name }} Release Branch Creation Failed"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Version:*\nv${{ steps.bump_version.outputs.new_version }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "⚠️ *Action Required:* Review the pipeline failures and fix the issues before retrying."
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: C09FDPQ8XPB
+            text: "❌ ${{ steps.get_package_name.outputs.package_name }} Release Branch Creation Failed"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "❌ ${{ steps.get_package_name.outputs.package_name }} Release Branch Creation Failed"
+              - type: section
+                fields:
+                  - type: mrkdwn
+                    text: "*Version:*\nv${{ steps.bump_version.outputs.new_version }}"
+                  - type: mrkdwn
+                    text: "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "⚠️ *Action Required:* Review the pipeline failures and fix the issues before retrying."

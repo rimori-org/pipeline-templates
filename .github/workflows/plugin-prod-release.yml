@@ -24,13 +24,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: "yarn"
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload scenario test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scenario-test-results
           path: test-results/
@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload E2E test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-test-results
           path: test-results/
@@ -176,56 +176,38 @@ jobs:
 
       - name: Send Slack notification - Success
         if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "✅ Production release of plugin ${{ inputs.plugin_name }} v${{ env.VERSION }} succeeded",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "✅ Plugin ${{ inputs.plugin_name }} release (prod)"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_CHANNEL_ID }}
+            text: "✅ Production release of plugin ${{ inputs.plugin_name }} v${{ env.VERSION }} succeeded"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "✅ Plugin ${{ inputs.plugin_name }} release (prod)"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
 
       - name: Send Slack notification - Failure
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_CHANNEL_ID }}
+            text: "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "❌ ${{ inputs.plugin_name }} - v${{ env.VERSION }}"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"

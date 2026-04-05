@@ -29,13 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: dev
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: "yarn"
@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload scenario test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scenario-test-results
           path: test-results/
@@ -83,19 +83,22 @@ jobs:
 
       - name: Fail Slack Notification
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build or Tests Failed",
-              "blocks": [
-                { "type": "header", "text": { "type": "plain_text", "text": "❌ Build/Tests Failed" } },
-                { "type": "section", "text": { "type": "mrkdwn", "text": "Check the workflow run for details: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" } }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_CHANNEL_ID }}
+            text: "❌ ${{ inputs.plugin_name }} Plugin Weekly Release: Build or Tests Failed"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "❌ Build/Tests Failed"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "Check the workflow run for details: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
 
   prepare-release:
     name: Prepare Weekly Release
@@ -104,14 +107,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: "yarn"
@@ -215,65 +218,42 @@ jobs:
 
       - name: Notify Slack for PR Approval
         if: success() && env.PR_NUMBER != 'null'
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_PR_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View PR>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_PR_CHANNEL_ID }}
+            text: "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "${{ inputs.plugin_name }} - v${{ env.NEW_VERSION }}"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "<${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR_NUMBER }}|View PR>"
 
       - name: Notify Slack on Failure
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "❌ ${{ inputs.plugin_name }} Plugin Weekly Release Preparation Failed",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "❌ Weekly Release Preparation Failed"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Plugin:*\n${{ inputs.plugin_name }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_CHANNEL_ID }}
+            text: "❌ ${{ inputs.plugin_name }} Plugin Weekly Release Preparation Failed"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "❌ Weekly Release Preparation Failed"
+              - type: section
+                fields:
+                  - type: mrkdwn
+                    text: "*Plugin:*\n${{ inputs.plugin_name }}"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
