@@ -69,6 +69,22 @@ jobs:
       - name: Restore package.json from git (ignore local changes)
         run: git checkout HEAD -- package.json
 
+      - name: Debug registry health before yarn add
+        if: github.event_name == 'push'
+        run: |
+          echo "=== Registry health check ==="
+          echo "Pinging registry..."
+          curl -v http://localhost:4873/-/ping 2>&1 || true
+          echo ""
+          echo "Verdaccio container status:"
+          docker ps --filter name=verdaccio --format '{{.Status}}' || true
+          echo ""
+          echo "Port 4873 listening:"
+          ss -tln | grep 4873 || echo "NOT LISTENING"
+          echo ""
+          echo "Active connections to 4873:"
+          ss -tn state established dst :4873 | wc -l
+
       - name: Update dependencies to latest pre-releases
         if: github.event_name == 'push'
         run: |
@@ -79,11 +95,19 @@ jobs:
           # Install all dependencies in a single command to prevent version conflicts
           # This ensures @rimori/playwright-testing@next is installed before client packages
           # that might depend on the stable version
-          yarn add \
-            "@rimori/client@${{ steps.versions.outputs.client_version }}" \
-            "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" \
-            "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" \
-            --exact
+          for i in 1 2 3; do
+            yarn add \
+              "@rimori/client@${{ steps.versions.outputs.client_version }}" \
+              "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" \
+              "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" \
+              --exact && break
+            echo "⚠️ Attempt $i failed, checking registry health..."
+            curl -s http://localhost:4873/-/ping 2>&1 || true
+            docker ps --filter name=verdaccio --format '{{.Status}}' || true
+            ss -tln | grep 4873 || echo "NOT LISTENING"
+            echo "Waiting 15s for registry to recover..."
+            sleep 15
+          done
           echo "Updated dependencies:"
           echo "  @rimori/client: ${{ steps.versions.outputs.client_version }}"
           echo "  @rimori/react-client: ${{ steps.versions.outputs.react_client_version }}"
@@ -95,10 +119,10 @@ jobs:
           # For PRs, use frozen-lockfile to ensure reproducible builds
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "Installing dependencies after version updates (no frozen lockfile)..."
-            yarn install
+            for i in 1 2 3; do yarn install && break; echo "⚠️ Retry $i..."; sleep 10; done
           else
             echo "Installing dependencies with frozen lockfile..."
-            yarn install --frozen-lockfile
+            for i in 1 2 3; do yarn install --frozen-lockfile && break; echo "⚠️ Retry $i..."; sleep 10; done
           fi
 
       - name: Verify correct versions installed
