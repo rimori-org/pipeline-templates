@@ -27,9 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          # cache: "yarn"
-          # cache-dependency-path: yarn.lock
           registry-url: "http://localhost:4873"
+
+      - name: Configure yarn to use local registry
+        run: yarn config set registry http://localhost:4873
 
       - name: Get latest pre-release versions
         if: github.event_name == 'push'
