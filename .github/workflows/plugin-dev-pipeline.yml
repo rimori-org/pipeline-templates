@@ -126,6 +126,9 @@ jobs:
       - name: TypeScript check
         run: yarn run check
 
+      - name: Lint check
+        run: yarn lint
+
       - name: Build worker
         run: yarn build:worker
 
@@ -138,7 +141,7 @@ jobs:
 
       - name: Run scenario tests
         if: github.event_name == 'push'
-        run: yarn playwright test '\.test\.ts$'
+        run: yarn playwright test '\.test\.ts$' --workers=4
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
