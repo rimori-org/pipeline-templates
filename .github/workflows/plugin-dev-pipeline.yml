@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           registry-url: "http://localhost:4873"
@@ -149,7 +149,7 @@ jobs:
 
       - name: Upload scenario test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scenario-test-results
           path: test-results/
@@ -184,7 +184,7 @@ jobs:
 
       - name: Upload E2E test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-test-results
           path: test-results/
@@ -192,28 +192,19 @@ jobs:
 
       - name: Notify Slack
         if: job.status != 'cancelled' && (success() || failure())
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          channel-id: ${{ env.SLACK_CHANNEL_ID }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            {
-              "text": "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || format('✅ {0} Plugin Release', inputs.plugin_name)) || format('❌ {0} Plugin Release Failed', inputs.plugin_name) }}",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || format('{0} plugin release', inputs.plugin_name) }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }})"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            channel: ${{ env.SLACK_CHANNEL_ID }}
+            text: "${{ job.status == 'success' && (github.event_name == 'pull_request' && '✅ PR CI Check' || format('✅ {0} Plugin Release', inputs.plugin_name)) || format('❌ {0} Plugin Release Failed', inputs.plugin_name) }}"
+            blocks:
+              - type: header
+                text:
+                  type: plain_text
+                  text: "${{ job.status == 'success' && '✅' || '❌' }} ${{ github.event_name == 'pull_request' && 'PR CI Check' || format('{0} plugin release', inputs.plugin_name) }} (${{ github.event_name == 'pull_request' && format('{0} → {1}', github.head_ref, github.base_ref) || github.ref_name }})"
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
