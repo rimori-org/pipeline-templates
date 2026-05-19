@@ -43,7 +43,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: '24'
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
@@ -125,7 +125,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: '24'
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
