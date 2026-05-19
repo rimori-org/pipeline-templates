@@ -31,9 +31,6 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Update npm
-        run: npm install -g npm@latest
-
       - name: Get package name
         id: get_package_name
         run: |
