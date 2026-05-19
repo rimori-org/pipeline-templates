@@ -29,31 +29,37 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: yarn.lock
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: TypeScript check
-        run: yarn run check
+        run: pnpm check
 
       - name: Build worker
-        run: yarn build:worker
+        run: pnpm build:worker
 
       - name: Build Project
-        run: yarn build
+        run: pnpm build
 
       - name: Install Playwright browsers
-        run: yarn playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run scenario tests
-        run: yarn playwright test '\.test\.ts$'
+        run: pnpm exec playwright test '\.test\.ts$'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
@@ -77,18 +83,18 @@ jobs:
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
-        run: yarn rimori-release beta
+        run: pnpm rimori-release beta
 
       - name: Release Stable to Dev Environment
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
-        run: yarn rimori-release stable
+        run: pnpm rimori-release stable
 
       - name: Run E2E tests
         run: |
           if [ -d "test/e2e" ]; then
-            yarn playwright test test/e2e/
+            pnpm exec playwright test test/e2e/
           else
             echo "No E2E tests found, skipping"
           fi
@@ -109,13 +115,13 @@ jobs:
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
-        run: yarn rimori-release beta
+        run: pnpm rimori-release beta
 
       - name: Release Stable to Production Environment
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
-        run: yarn rimori-release stable
+        run: pnpm rimori-release stable
 
       - name: Sync main back to dev
         if: success()
@@ -134,12 +140,12 @@ jobs:
           MERGE_STATUS=$?
           set -e
 
-          # If merge had conflicts, resolve package.json, yarn.lock, and package-lock.json by accepting main's version
+          # If merge had conflicts, resolve package.json and pnpm-lock.yaml by accepting main's version
           if [ $MERGE_STATUS -ne 0 ] || [ -n "$(git ls-files -u)" ]; then
-            echo "Resolving conflicts in package.json and lock files by accepting main's version..."
-            
+            echo "Resolving conflicts in package.json and lock file by accepting main's version..."
+
             # Resolve conflicts for files that exist and have conflicts
-            for file in package.json yarn.lock package-lock.json; do
+            for file in package.json pnpm-lock.yaml; do
               if git ls-files -u | grep -q "$file"; then
                 echo "Resolving conflict in $file..."
                 git checkout --theirs "$file" 2>/dev/null || true
@@ -151,7 +157,7 @@ jobs:
             if [ -z "$(git ls-files -u)" ]; then
               git commit --no-edit -m "chore: sync main back to dev after production release [skip ci]"
             else
-              echo "Warning: Other conflicts remain beyond package.json and lock files"
+              echo "Warning: Other conflicts remain beyond package.json and pnpm-lock.yaml"
               exit 1
             fi
           fi

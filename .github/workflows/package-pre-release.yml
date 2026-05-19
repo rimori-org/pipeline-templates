@@ -17,13 +17,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: 'yarn'
-          cache-dependency-path: yarn.lock
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -63,15 +69,15 @@ jobs:
       - name: Update @rimori/client dependency
         if: steps.check_package.outputs.update_rimori_client == 'true'
         run: |
-          yarn add "@rimori/client@${{ steps.client-version.outputs.version }}" --dev --exact
+          pnpm add -D "@rimori/client@${{ steps.client-version.outputs.version }}" --save-exact
           node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json')); if (pkg.peerDependencies && pkg.peerDependencies['@rimori/client']) { pkg.peerDependencies['@rimori/client'] = '${{ steps.client-version.outputs.version }}'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
           echo "Updated @rimori/client to ${{ steps.client-version.outputs.version }}"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build package
-        run: yarn build
+        run: pnpm build
 
       - name: Calculate next pre-release version
         id: version

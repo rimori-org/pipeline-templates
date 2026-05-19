@@ -23,14 +23,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: "http://localhost:4873"
 
-      - name: Configure yarn to use local registry
-        run: yarn config set registry http://localhost:4873
+      - name: Configure pnpm to use local registry
+        run: pnpm config set registry http://localhost:4873
 
       - name: Get latest pre-release versions
         if: github.event_name == 'push'
@@ -79,11 +87,11 @@ jobs:
           # Install all dependencies in a single command to prevent version conflicts
           # This ensures @rimori/playwright-testing@next is installed before client packages
           # that might depend on the stable version
-          yarn add \
+          pnpm add \
             "@rimori/client@${{ steps.versions.outputs.client_version }}" \
             "@rimori/react-client@${{ steps.versions.outputs.react_client_version }}" \
             "@rimori/playwright-testing@${{ steps.versions.outputs.playwright_version }}" \
-            --exact
+            --save-exact
           echo "Updated dependencies:"
           echo "  @rimori/client: ${{ steps.versions.outputs.client_version }}"
           echo "  @rimori/react-client: ${{ steps.versions.outputs.react_client_version }}"
@@ -95,10 +103,10 @@ jobs:
           # For PRs, use frozen-lockfile to ensure reproducible builds
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "Installing dependencies after version updates (no frozen lockfile)..."
-            yarn install
+            pnpm install --no-frozen-lockfile
           else
             echo "Installing dependencies with frozen lockfile..."
-            yarn install --frozen-lockfile
+            pnpm install --frozen-lockfile
           fi
 
       - name: Verify correct versions installed
@@ -125,24 +133,24 @@ jobs:
           echo "✅ All versions verified correctly"
 
       - name: TypeScript check
-        run: yarn run check
+        run: pnpm check
 
       - name: Lint check
-        run: yarn lint
+        run: pnpm lint
 
       - name: Build worker
-        run: yarn build:worker
+        run: pnpm build:worker
 
       - name: Build Project
-        run: yarn build
+        run: pnpm build
 
       - name: Install Playwright browsers
         if: github.event_name == 'push'
-        run: yarn playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run scenario tests
         if: github.event_name == 'push'
-        run: yarn playwright test '\.test\.ts$' --workers=6
+        run: pnpm exec playwright test '\.test\.ts$' --workers=6
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
@@ -161,20 +169,20 @@ jobs:
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://dev-api.rimori.se
-        run: yarn rimori-release alpha
+        run: pnpm rimori-release alpha
 
       - name: Release Alpha to Production Environment
         if: github.event_name == 'push'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
           RIMORI_BACKEND_URL: https://api.rimori.se
-        run: yarn rimori-release alpha
+        run: pnpm rimori-release alpha
 
       - name: Run E2E tests
         if: github.event_name == 'push'
         run: |
           if [ -d "test/e2e" ]; then
-            yarn playwright test test/e2e/
+            pnpm exec playwright test test/e2e/
           else
             echo "No E2E tests found, skipping"
           fi

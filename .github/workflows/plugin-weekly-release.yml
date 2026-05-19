@@ -34,42 +34,45 @@ jobs:
           ref: dev
           fetch-depth: 0
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: yarn.lock
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: |
-          yarn cache clean
-          yarn install
-          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client --latest
+          pnpm install
+          pnpm update @rimori/playwright-testing @rimori/client @rimori/react-client --latest
 
       - name: Print dependency versions
         run: |
           echo "=== Installed Package Versions ==="
-          echo "rimori-client: $(yarn list --pattern rimori-client --depth=0 2>/dev/null | grep rimori-client@ || echo 'Not installed')"
-          echo "playwright-testing: $(yarn list --pattern playwright-testing --depth=0 2>/dev/null | grep playwright-testing@ || echo 'Not installed')"
-          echo "react-client: $(yarn list --pattern react-client --depth=0 2>/dev/null | grep react-client@ || echo 'Not installed')"
+          pnpm list @rimori/client @rimori/react-client @rimori/playwright-testing --depth=0 || echo 'Some packages not installed'
           echo "=================================="
 
       - name: TypeScript check
-        run: yarn run check
+        run: pnpm check
 
       - name: Build worker
-        run: yarn build:worker
+        run: pnpm build:worker
 
       - name: Build application
-        run: yarn build
+        run: pnpm build
 
       - name: Install Playwright browsers
-        run: yarn playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run scenario tests
-        run: yarn playwright test '\.test\.ts$'
+        run: pnpm exec playwright test '\.test\.ts$'
         env:
           RIMORI_TOKEN: ${{ secrets.RIMORI_TOKEN }}
 
@@ -113,12 +116,18 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: yarn.lock
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Configure Git
         run: |
@@ -159,17 +168,16 @@ jobs:
           npm version $NEW_VERSION --no-git-tag-version
 
           # Sync lockfile with updated package.json version
-          echo "Syncing yarn.lock with new version..."
-          yarn install
+          echo "Syncing pnpm-lock.yaml with new version..."
+          pnpm install
 
           # Upgrade Rimori packages to latest versions
           echo "Upgrading Rimori packages to latest versions..."
-          yarn upgrade @rimori/playwright-testing @rimori/client @rimori/react-client --latest
+          pnpm update @rimori/playwright-testing @rimori/client @rimori/react-client --latest
 
           # Commit version bump and lockfile
           git add package.json
-          [ -f package-lock.json ] && git add package-lock.json
-          [ -f yarn.lock ] && git add yarn.lock
+          [ -f pnpm-lock.yaml ] && git add pnpm-lock.yaml
           git commit -m "chore: bump version to $NEW_VERSION and update lockfile"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
